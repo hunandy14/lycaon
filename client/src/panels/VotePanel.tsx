@@ -35,7 +35,7 @@ export function VotePanel(props: PanelProps) {
           </>
         ) : (
           <>
-            <div className="panel-hint">逐一點選每位玩家投給誰（警長 1.5 票）。</div>
+            <div className="panel-hint">記錄放逐投票（警長 1.5 票）：唱票＝先點被投者再點出手勢的人；表格＝逐人總覽微調。</div>
             <VoteRecorder
               state={state}
               voters={voters}

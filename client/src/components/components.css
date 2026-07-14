@@ -310,6 +310,85 @@
   color: var(--accent);
 }
 
+/* ---------- 計票模式切換 ---------- */
+.seg {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin-bottom: 12px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 8px;
+  border-radius: 7px;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+.seg-btn.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- 唱票模式 ---------- */
+.cluster-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+.cluster-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cl-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev2);
+  border: 1.5px solid var(--tcolor, var(--border));
+  transition: transform 0.06s;
+  min-height: 58px;
+}
+.cl-cell:active {
+  transform: scale(0.94);
+}
+.cl-num {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.cl-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.cl-active-target {
+  background: color-mix(in srgb, var(--tcolor) 20%, var(--bg-elev2));
+  box-shadow: 0 0 0 1.5px var(--tcolor);
+}
+.cl-voted {
+  background: color-mix(in srgb, var(--tcolor) 12%, var(--bg-elev2));
+}
+.cl-disabled {
+  opacity: 0.3;
+}
+
 /* ---------- 名單勾選（上警） ---------- */
 .checklist {
   display: grid;
