@@ -168,18 +168,22 @@ function ClusterInput({
           const isVotable = !picking && voters.includes(seat);
           const disabled = picking ? !isTargetable : !isVotable && seat !== activeTarget;
           const votedFor = typeof c === 'number' ? c : null;
+          // 「已投票」的彩色外框只在正在對某對象收票時強調（方便對照當下顏色）；
+          // 回到「選唱票對象」畫面時外框收斂成中性灰，避免看起來像「還沒清掉的選取狀態」。
+          // 徽章文字（→X）不受影響，仍照原本顏色顯示，資訊不會遺失。
+          const showVotedFrame = votedFor !== null && !picking;
           return (
             <button
               key={seat}
               className={[
                 'cl-cell',
                 seat === activeTarget ? 'cl-active-target' : '',
-                votedFor !== null ? 'cl-voted' : '',
+                showVotedFrame ? 'cl-voted' : '',
                 disabled ? 'cl-disabled' : '',
               ].join(' ')}
               style={
                 {
-                  '--tcolor': seat === activeTarget ? targetColor(seat) : votedFor !== null ? targetColor(votedFor) : 'var(--border)',
+                  '--tcolor': seat === activeTarget ? targetColor(seat) : showVotedFrame ? targetColor(votedFor) : 'var(--border)',
                 } as React.CSSProperties
               }
               disabled={disabled && seat !== activeTarget}
