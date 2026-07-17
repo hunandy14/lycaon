@@ -1,4 +1,6 @@
 import { ROLE_META, roleName } from './types/roles';
+import { factionOf } from './alignment';
+import { checkVictory } from './victory';
 import type { EventEnvelope } from './types/events';
 import type { GameConfig } from './types/rules';
 import { EMPTY_NIGHT, type GameState } from './types/state';
@@ -27,11 +29,14 @@ export function initialState(config: GameConfig, seq: number, at: string): GameS
         name: s.name,
         alive: true,
         idiotRevealed: false,
+        converted: false,
         canVote: true,
         skillUsed: false,
       })),
     night: { ...EMPTY_NIGHT },
     lastGuardTarget: null,
+    lovers: null,
+    seedWolfUsedOnNight: null,
     potions: { antidote: hasWitch, poison: hasWitch },
     pendingDeaths: [],
     actionQueue: [],
@@ -86,6 +91,24 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
       enterNight(ctx);
       break;
 
+    case 'CUPID_LINKED': {
+      next.lovers = event.a < event.b ? [event.a, event.b] : [event.b, event.a];
+      pushLog(ctx, `💘 邱比特將 ${seatLabel(next, event.a)}與 ${seatLabel(next, event.b)}連結為情侶`, true);
+      advanceNight(next);
+      break;
+    }
+
+    case 'SEED_WOLF_ACTED':
+      if (event.infect) {
+        next.night.infect = true;
+        next.seedWolfUsedOnNight = next.day;
+        pushLog(ctx, `🦠 種狼發動感染：今晚刀口 ${seatLabel(next, next.night.wolfTarget!)}將轉入狼人陣營`, true);
+      } else {
+        pushLog(ctx, '種狼今晚不發動感染', true);
+      }
+      advanceNight(next);
+      break;
+
     case 'GUARD_ACTED':
       next.night.guardTarget = event.target;
       pushLog(ctx, event.target === null ? '守衛今晚空守' : `守衛守護 ${seatLabel(next, event.target)}`, true);
@@ -115,7 +138,7 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
 
     case 'SEER_ACTED': {
       next.night.seerTarget = event.target;
-      const result = ROLE_META[next.players.find((p) => p.seat === event.target)!.role].faction;
+      const result = factionOf(next.players.find((p) => p.seat === event.target)!);
       next.seerChecks.push({ night: next.day, target: event.target, result });
       pushLog(ctx, `預言家查驗 ${seatLabel(next, event.target)}：${result === 'wolf' ? '狼人 🐺' : '好人 ✋'}`, true);
       advanceNight(next);
@@ -125,6 +148,12 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
     case 'NIGHT_ENDED': {
       next.pendingDeaths = settleNight(next);
       next.lastGuardTarget = next.night.guardTarget;
+      // 種狼感染於天亮生效：刀口轉入狼人陣營（同夜被毒仍會死，見 settleNight）
+      if (next.night.infect && next.night.wolfTarget !== null) {
+        const infected = next.players.find((p) => p.seat === next.night.wolfTarget)!;
+        infected.converted = true;
+        pushLog(ctx, `🦠 ${seatLabel(next, infected.seat)}【${roleName(infected.role)}】已被感染，加入狼人陣營`, true);
+      }
       const summary =
         next.pendingDeaths.length === 0
           ? '夜晚結算：平安夜'
@@ -165,9 +194,20 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
 
     case 'DEATHS_ANNOUNCED': {
       pushLog(ctx, buildDawnAnnouncement(next), false);
+      // 套用期間保留 pendingDeaths：殉情級聯據此避開「另一半本來就會死」的情況（保留真實死因）
       const deaths = [...next.pendingDeaths].sort((a, b) => a.seat - b.seat);
-      next.pendingDeaths = [];
       for (const d of deaths) applyDeath(ctx, d.seat, d.cause, d.poisoned, 'night');
+      next.pendingDeaths = [];
+      // 感染造成的陣營改變也可能達成屠邊（例如最後一個神被感染），死亡結算後補查一次
+      if (!next.winner) {
+        const v = checkVictory(next);
+        if (v) {
+          next.winner = v;
+          next.actionQueue = [];
+          next.phase = { t: 'ended' };
+          pushLog(ctx, `遊戲結束：${v.reason}`, false);
+        }
+      }
       if (next.phase.t !== 'ended') {
         next.phase = { t: 'day', stage: next.dayInterrupted ? 'dayEnd' : 'speech' };
       }

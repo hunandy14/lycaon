@@ -5,10 +5,12 @@ export type RoleId =
   | 'idiot'
   | 'guard'
   | 'knight'
+  | 'cupid'
   | 'villager'
   | 'werewolf'
   | 'blackWolfKing'
-  | 'whiteWolfKing';
+  | 'whiteWolfKing'
+  | 'seedWolf';
 
 export type Faction = 'good' | 'wolf';
 export type RoleClass = 'god' | 'villager' | 'wolf';
@@ -29,10 +31,12 @@ export const ROLE_META: Record<RoleId, RoleMeta> = {
   idiot: { name: '白癡', short: '白', faction: 'good', cls: 'god' },
   guard: { name: '守衛', short: '守', faction: 'good', cls: 'god' },
   knight: { name: '騎士', short: '騎', faction: 'good', cls: 'god' },
+  cupid: { name: '邱比特', short: '邱', faction: 'good', cls: 'god' },
   villager: { name: '平民', short: '民', faction: 'good', cls: 'villager' },
   werewolf: { name: '狼人', short: '狼', faction: 'wolf', cls: 'wolf' },
   blackWolfKing: { name: '黑狼王', short: '黑狼', faction: 'wolf', cls: 'wolf', deathSkill: 'shoot' },
   whiteWolfKing: { name: '白狼王', short: '白狼', faction: 'wolf', cls: 'wolf' },
+  seedWolf: { name: '種狼', short: '種狼', faction: 'wolf', cls: 'wolf' },
 };
 
 export const ALL_ROLES = Object.keys(ROLE_META) as RoleId[];

@@ -248,6 +248,10 @@ function RulesStep({ rules, setRules, onNext }: { rules: RuleConfig; setRules: (
         onChange={(v) => T({ lastWordsOnNightDeath: v as RuleConfig['lastWordsOnNightDeath'] })}
       />
       <ToggleRow label="翻牌白癡再被票出局" hint="已翻牌白癡再次被投票則出局" value={rules.idiotExiledAgainDies} onChange={(v) => T({ idiotExiledAgainDies: v })} />
+      <h3 className="small muted" style={{ margin: '16px 0 8px' }}>擴充角色（邱比特／種狼，板上有才生效）</h3>
+      <ToggleRow label="殉情可以開槍" hint="情侶殉情死亡的獵人／黑狼王仍可發動技能" value={rules.lovesickCanShoot} onChange={(v) => T({ lovesickCanShoot: v })} />
+      <ToggleRow label="種狼首夜可感染" hint="關閉時依標準規則：第二夜起才能發動感染" value={rules.seedWolfFirstNight} onChange={(v) => T({ seedWolfFirstNight: v })} />
+      <ToggleRow label="被感染者保留技能" hint="關閉時依標準規則：感染後失去原技能、變普通狼" value={rules.infectedKeepsSkills} onChange={(v) => T({ infectedKeepsSkills: v })} />
       <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }} onClick={onNext}>
         下一步：輸入角色
       </button>

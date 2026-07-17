@@ -1,6 +1,7 @@
 import type { Ballot } from '../types/events';
 import type { SeatId } from '../types/rules';
 import type { GameState } from '../types/state';
+import { hasSkills } from '../alignment';
 import { applyDeath } from './deaths';
 import { pushLog, player, seatLabel, type Ctx } from '../ctx';
 
@@ -46,7 +47,7 @@ export function resolveExileVote(ctx: Ctx, ballots: Ballot[]): void {
     const seat = top[0]!;
     const p = player(state, seat);
     state.exile = null;
-    if (p.role === 'idiot' && !p.idiotRevealed) {
+    if (p.role === 'idiot' && !p.idiotRevealed && hasSkills(p, state.config.rules)) {
       p.idiotRevealed = true;
       p.canVote = false;
       pushLog(ctx, `${seatLabel(state, seat)}被放逐，翻牌亮出【白癡】：免死，之後可發言但失去投票權`, false);

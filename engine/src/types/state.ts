@@ -8,7 +8,8 @@ export type DeathCause =
   | 'exile' // 被放逐
   | 'shot' // 被獵人/黑狼王/白狼王自爆帶走
   | 'duel' // 騎士決鬥
-  | 'explode'; // 自爆
+  | 'explode' // 自爆
+  | 'lovesick'; // 殉情（情侶另一半死亡）
 
 export interface DeathInfo {
   day: number;
@@ -26,6 +27,8 @@ export interface PlayerState {
   death?: DeathInfo;
   /** 白癡被票翻牌：存活但失去投票權 */
   idiotRevealed: boolean;
+  /** 被種狼感染：轉入狼人陣營（技能是否保留依 infectedKeepsSkills） */
+  converted: boolean;
   canVote: boolean;
   /** 一次性主動技能已用（騎士決鬥） */
   skillUsed: boolean;
@@ -59,6 +62,8 @@ export type Phase =
 export interface NightBuffer {
   guardTarget: SeatId | null;
   wolfTarget: SeatId | null;
+  /** 種狼今晚發動感染（作用於 wolfTarget，天亮生效） */
+  infect: boolean;
   witchSaved: boolean;
   witchPoison: SeatId | null;
   seerTarget: SeatId | null;
@@ -103,6 +108,10 @@ export interface GameState {
   night: NightBuffer;
   /** 上一晚守衛目標（禁連守驗證） */
   lastGuardTarget: SeatId | null;
+  /** 邱比特連結的情侶（一方死另一方殉情；跨陣營=第三方） */
+  lovers: [SeatId, SeatId] | null;
+  /** 種狼感染已於第幾夜使用（null=未用） */
+  seedWolfUsedOnNight: number | null;
   potions: { antidote: boolean; poison: boolean };
   /** 已結算、未公佈的夜晚死亡（首日競選時死者仍參與） */
   pendingDeaths: PendingDeath[];
@@ -113,13 +122,14 @@ export interface GameState {
   /** 白天被中斷（自爆/決鬥成功）：跳過發言與投票 */
   dayInterrupted: boolean;
   seerChecks: SeerCheck[];
-  winner: { faction: Faction; reason: string } | null;
+  winner: { faction: Faction | 'lovers'; reason: string } | null;
   log: TimelineEntry[];
 }
 
 export const EMPTY_NIGHT: NightBuffer = {
   guardTarget: null,
   wolfTarget: null,
+  infect: false,
   witchSaved: false,
   witchPoison: null,
   seerTarget: null,

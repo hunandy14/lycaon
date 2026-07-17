@@ -1,4 +1,4 @@
-import { ROLE_META } from './types/roles';
+import { factionOf, clsOf } from './alignment';
 import type { SeatId } from './types/rules';
 import type { GameState } from './types/state';
 import { currentNightStep } from './night/plan';
@@ -14,14 +14,15 @@ export interface DashboardStats {
 export function dashboardStats(state: GameState): DashboardStats {
   const alive = state.players.filter((p) => p.alive);
   return {
-    wolves: alive.filter((p) => ROLE_META[p.role].faction === 'wolf').length,
-    gods: alive.filter((p) => ROLE_META[p.role].cls === 'god').length,
-    villagers: alive.filter((p) => ROLE_META[p.role].cls === 'villager').length,
+    wolves: alive.filter((p) => factionOf(p) === 'wolf').length,
+    gods: alive.filter((p) => clsOf(p) === 'god').length,
+    villagers: alive.filter((p) => clsOf(p) === 'villager').length,
     aliveTotal: alive.length,
   };
 }
 
 export type TargetPurpose =
+  | 'cupidLink'
   | 'guard'
   | 'wolfKill'
   | 'witchPoison'
@@ -37,6 +38,8 @@ export function eligibleTargets(state: GameState, purpose: TargetPurpose): SeatI
   const alive = state.players.filter((p) => p.alive).map((p) => p.seat);
   const notPending = (seats: SeatId[]) => seats.filter((s) => !state.pendingDeaths.some((d) => d.seat === s));
   switch (purpose) {
+    case 'cupidLink':
+      return alive;
     case 'guard':
       return alive.filter((s) => s !== state.lastGuardTarget);
     case 'wolfKill':
@@ -61,7 +64,7 @@ export function eligibleTargets(state: GameState, purpose: TargetPurpose): SeatI
     case 'badge':
       return notPending(alive);
     case 'explode':
-      return notPending(alive.filter((s) => ROLE_META[state.players.find((p) => p.seat === s)!.role].faction === 'wolf'));
+      return notPending(alive.filter((s) => factionOf(state.players.find((p) => p.seat === s)!) === 'wolf'));
   }
 }
 
@@ -88,7 +91,14 @@ export function nextStepHint(state: GameState): string {
     case 'night': {
       const step = currentNightStep(state);
       if (!step) return '夜晚行動完成，按「天亮」進行結算';
-      const labels = { guard: '守衛請睜眼，選擇守護對象', wolves: '狼人請睜眼，選擇擊殺對象', witch: '女巫請睜眼', seer: '預言家請睜眼，選擇查驗對象' };
+      const labels = {
+        cupid: '邱比特請睜眼，連結兩位玩家為情侶',
+        guard: '守衛請睜眼，選擇守護對象',
+        wolves: '狼人請睜眼，選擇擊殺對象',
+        seedWolf: '種狼請睜眼，決定是否感染今晚刀口',
+        witch: '女巫請睜眼',
+        seer: '預言家請睜眼，選擇查驗對象',
+      };
       return labels[step.id];
     }
     case 'day': {

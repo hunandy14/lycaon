@@ -16,8 +16,10 @@ export type GameEvent =
   | { type: 'GAME_CREATED'; config: GameConfig }
   // 夜晚
   | { type: 'NIGHT_STARTED' }
+  | { type: 'CUPID_LINKED'; a: SeatId; b: SeatId } // 僅首夜
   | { type: 'GUARD_ACTED'; target: SeatId | null } // null = 空守
   | { type: 'WOLVES_ACTED'; target: SeatId | null } // null = 空刀
+  | { type: 'SEED_WOLF_ACTED'; infect: boolean } // 感染今晚刀口（一局一次）
   | { type: 'WITCH_ACTED'; save: boolean; poison: SeatId | null }
   | { type: 'SEER_ACTED'; target: SeatId }
   | { type: 'NIGHT_ENDED' }

@@ -4,6 +4,7 @@ export function StatusBar({ state }: { state: GameState }) {
   const s = dashboardStats(state);
   const hasWitch = state.config.seats.some((x) => x.role === 'witch');
   const hasGuard = state.config.seats.some((x) => x.role === 'guard');
+  const hasSeedWolf = state.config.seats.some((x) => x.role === 'seedWolf');
   const lastGuard = state.lastGuardTarget;
 
   return (
@@ -19,6 +20,11 @@ export function StatusBar({ state }: { state: GameState }) {
         </span>
       )}
       {hasGuard && lastGuard !== null && <span className="stat">昨守 <b>{lastGuard}</b></span>}
+      {hasSeedWolf && (
+        <span className="stat">
+          <span className={state.seedWolfUsedOnNight === null ? '' : 'potion-used'}>感染🦠</span>
+        </span>
+      )}
     </div>
   );
 }

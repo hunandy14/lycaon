@@ -25,6 +25,7 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
   for (const c of state.seerChecks) checks.set(c.target, c.result);
 
   const pendingDead = new Set(state.pendingDeaths.map((d) => d.seat));
+  const lovers = new Set(state.lovers ?? []);
 
   return (
     <div className="seatgrid">
@@ -44,7 +45,7 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
               selectable && !disabled ? 'seat-tappable' : '',
               disabled ? 'seat-disabled' : '',
             ].join(' ')}
-            style={{ '--seat-color': factionColor(p.role) } as React.CSSProperties}
+            style={{ '--seat-color': p.converted ? 'var(--wolf)' : factionColor(p.role) } as React.CSSProperties}
             onClick={() => onPick && isEligible && !dead && onPick(p.seat)}
             disabled={disabled}
           >
@@ -55,6 +56,8 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
             {showRoles && <div className="seat-role">{roleShort(p.role)}</div>}
             {p.name && <div className="seat-name">{p.name}</div>}
             <div className="seat-marks">
+              {lovers.has(p.seat) && <span className="chip chip-lover">💘</span>}
+              {p.converted && <span className="chip chip-wolf">感染</span>}
               {check && <span className={`chip chip-${check}`}>{check === 'wolf' ? '查殺' : '金水'}</span>}
               {p.idiotRevealed && <span className="chip chip-idiot">白癡</span>}
               {pendingDead.has(p.seat) && !dead && <span className="chip chip-pending">待公佈</span>}

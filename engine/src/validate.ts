@@ -1,4 +1,5 @@
 import { ROLE_META } from './types/roles';
+import { factionOf, hasSkills } from './alignment';
 import type { GameEvent } from './types/events';
 import type { SeatId } from './types/rules';
 import type { GameState } from './types/state';
@@ -65,6 +66,29 @@ export function validate(state: GameState | null, event: GameEvent): ValidationR
 
     case 'NIGHT_STARTED':
       return state.phase.t === 'setup' ? ok : fail('只有開局時才用「天黑請閉眼」，白天結束請用「進入下一夜」');
+
+    case 'CUPID_LINKED': {
+      const step = requireNightStep(state, 'cupid');
+      if (step !== true) return step;
+      if (event.a === event.b) return fail('情侶必須是兩個不同的人');
+      for (const seat of [event.a, event.b]) {
+        const t = seatOf(state, seat);
+        if (!t) return fail(`座位 ${seat} 不存在`);
+        if (!t.alive) return fail('不能連結已死亡的玩家');
+      }
+      return ok;
+    }
+
+    case 'SEED_WOLF_ACTED': {
+      const step = requireNightStep(state, 'seedWolf');
+      if (step !== true) return step;
+      if (event.infect) {
+        if (state.night.wolfTarget === null) return fail('今晚狼人空刀，沒有可感染的刀口');
+        const t = seatOf(state, state.night.wolfTarget)!;
+        if (factionOf(t) !== 'good') return fail('刀口是狼人陣營，無法感染');
+      }
+      return ok;
+    }
 
     case 'GUARD_ACTED': {
       const step = requireNightStep(state, 'guard');
@@ -198,6 +222,7 @@ export function validate(state: GameState | null, event: GameEvent): ValidationR
       if (!knight || knight.role !== 'knight') return fail(`${event.knight} 號不是騎士`);
       if (!knight.alive) return fail('騎士已死亡');
       if (knight.skillUsed) return fail('騎士已經用過決鬥技能');
+      if (!hasSkills(knight, state.config.rules)) return fail('騎士已被感染，失去決鬥技能');
       const t = seatOf(state, event.target);
       if (!t) return fail('目標座位不存在');
       if (!t.alive) return fail('不能決鬥已死亡的玩家');
@@ -212,7 +237,7 @@ export function validate(state: GameState | null, event: GameEvent): ValidationR
       const p = seatOf(state, event.seat);
       if (!p) return fail('座位不存在');
       if (!p.alive) return fail('該玩家已死亡');
-      if (ROLE_META[p.role].faction !== 'wolf') return fail('只有狼人陣營可以自爆');
+      if (factionOf(p) !== 'wolf') return fail('只有狼人陣營可以自爆');
       if (isPendingDead(state, event.seat)) return fail('該玩家昨晚已死亡（死訊尚未公佈），不能自爆');
       return ok;
     }
@@ -238,7 +263,7 @@ function queueHint(head: NonNullable<GameState['actionQueue'][number]>): string 
   }
 }
 
-function requireNightStep(state: GameState, id: 'guard' | 'wolves' | 'witch' | 'seer'): true | ValidationResult {
+function requireNightStep(state: GameState, id: 'cupid' | 'guard' | 'wolves' | 'seedWolf' | 'witch' | 'seer'): true | ValidationResult {
   if (state.phase.t !== 'night') return fail('現在不是夜晚');
   const step = currentNightStep(state);
   if (!step) return fail('夜晚行動已全部完成，請天亮');
@@ -246,7 +271,7 @@ function requireNightStep(state: GameState, id: 'guard' | 'wolves' | 'witch' | '
   return true;
 }
 
-const STEP_LABEL = { guard: '守衛', wolves: '狼人', witch: '女巫', seer: '預言家' } as const;
+const STEP_LABEL = { cupid: '邱比特', guard: '守衛', wolves: '狼人', seedWolf: '種狼', witch: '女巫', seer: '預言家' } as const;
 
 function requireSheriffStage(state: GameState): true | ValidationResult {
   if (state.phase.t !== 'day' || state.phase.stage !== 'sheriff') return fail('現在不是警長競選階段');

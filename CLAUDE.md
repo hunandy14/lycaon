@@ -55,10 +55,14 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - 用到的引擎 selectors：`buildNightPlan`/`currentNightStep`、`eligibleTargets`、`dashboardStats`、`buildDawnAnnouncement`、`exileVoters`/`electionVoters`、`activeCandidates`、`tally`。
 - 樣式：`styles.css` + `components/components.css`，暗色夜晚主題，CSS 變數在 `:root`。`useWakeLock` 主持中防螢幕休眠。
 
-## 進度（2026-07-15）
+## 進度（2026-07-17）
 
-- ✅ M0–M5 全部完成。`npm test` 55 綠、`npm run build` 綠、真實 Chrome 截圖驗證五大畫面、單埠 production 模式驗證（SPA fallback + API + 靜態同埠）。
-- ⬜ M6：cloudflared 接 werewolfs.win（見 README「部署」）。玩家端（SSE 廣播 + secret 過濾）仍為未來項目。
+- ✅ M0–M5 全部完成；已上線 dashboard.werewolfs.win（cloudflared + Zero Trust）。
+- ✅ 擴充角色：**邱比特**（首夜連結情侶、殉情級聯走 applyDeath、跨陣營=第三方勝利 `winner.faction==='lovers'`）與**種狼**（夜晚感染刀口轉狼陣營、一局一次）。
+  - 陣營/類別判斷一律走 `engine/src/alignment.ts` 的 `factionOf`/`clsOf`/`hasSkills`，**禁止直接查 ROLE_META**（感染會讓陣營在局中改變）。
+  - 新規則開關：`lovesickCanShoot`、`seedWolfFirstNight`、`infectedKeepsSkills`（預設皆 false=主流規則）。
+  - 感染天亮生效（當夜查驗仍好人）；感染只擋刀不擋毒；`npm test` 72 綠。
+- ⬜ 玩家端（SSE 廣播 + secret 過濾）仍為未來項目。
 
 ## 執行
 

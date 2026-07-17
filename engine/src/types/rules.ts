@@ -17,6 +17,12 @@ export interface RuleConfig {
   idiotExiledAgainDies: boolean;
   /** 死亡角色夜晚仍走過場喊話（防止玩家從音頻推理身分） */
   callDeadRoles: boolean;
+  /** 殉情的獵人/黑狼王可以開槍 */
+  lovesickCanShoot: boolean;
+  /** 種狼首夜即可感染（預設第二夜起） */
+  seedWolfFirstNight: boolean;
+  /** 被感染者保留原技能（預設失去技能、變普通狼） */
+  infectedKeepsSkills: boolean;
 }
 
 export const DEFAULT_RULES: RuleConfig = {
@@ -27,6 +33,9 @@ export const DEFAULT_RULES: RuleConfig = {
   lastWordsOnNightDeath: 'firstDayOnly',
   idiotExiledAgainDies: true,
   callDeadRoles: true,
+  lovesickCanShoot: false,
+  seedWolfFirstNight: false,
+  infectedKeepsSkills: false,
 };
 
 export type PresetId = 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'custom';

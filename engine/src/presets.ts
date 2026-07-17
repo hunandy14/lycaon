@@ -33,7 +33,7 @@ export const BOARD_PRESETS: BoardPreset[] = [
   },
 ];
 
-const UNIQUE_ROLES: RoleId[] = ['seer', 'witch', 'hunter', 'idiot', 'guard', 'knight', 'blackWolfKing', 'whiteWolfKing'];
+const UNIQUE_ROLES: RoleId[] = ['seer', 'witch', 'hunter', 'idiot', 'guard', 'knight', 'cupid', 'blackWolfKing', 'whiteWolfKing', 'seedWolf'];
 
 /** 建局配置驗證；回傳繁中錯誤訊息清單（空陣列 = 合法） */
 export function validateConfig(config: GameConfig): string[] {
