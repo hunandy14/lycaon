@@ -36,7 +36,7 @@ npx tsc -p engine/tsconfig.json && npx tsc -p server/tsconfig.json   # typecheck
 
 ```
 POST /api/games                → 建局 {id}；body = GameConfig
-GET  /api/games                → 列表
+GET  /api/games                → 列表（含 progress 進度快照；快照存 games.progress_json，append/undo/redo 時更新，舊局懶補）
 GET  /api/games/:id            → { envelopes, redoCount }，client 自行 replay
 POST /api/games/:id/events     → { event, expectedSeq }；409=seq 衝突、400=validate 拒絕（繁中 reason）
 POST /api/games/:id/undo       → { toSeq? }；建局事件不可撤銷；append 會清掉 redo 分支
@@ -48,7 +48,7 @@ DELETE /api/games/:id
 
 phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 
-- `pages/`：`HomePage`（列表：進行中/歷史）、`NewGamePage`（4 步建局精靈）、`GamePage`（主儀表板）、`TimelinePage`（時間軸 + 回退到此）。
+- `pages/`：`HomePage`（列表：進行中含進度、歷史含勝方）、`NewGamePage`（5 步建局精靈，含角色池）、`GamePage`（主儀表板）、`TimelinePage`（時間軸 + 回退到此）、`ReportPage`（終局報表，進行中/中止局也可看）。
 - `hooks/useGame.ts`：載入事件 → 本地 `replay` → `dispatch` 樂觀更新（本地先 `validate`，成功才 POST，失敗回滾；409 自動重載）。undo/redo 走 server 後 refetch。
 - `panels/PhasePanel.tsx`：依 `state.phase` 與 `actionQueue` 路由到對應面板（**佇列非空時優先 ResolvePanel**，對齊引擎 validate）。面板：`SetupPanel` / `NightWizard`（含 WitchStep、NightComplete 顯示查驗結果）/ `DawnPanel` / `SheriffPanel` / `VotePanel`（+ `InterruptBar` 騎士/自爆）/ `ResolvePanel`（遺言/開槍/警徽 FIFO）/ `DayEndPanel` / `GameOverPanel`。
 - `components/`：`SeatGrid`（全 app 目標選擇器，接 `eligibleTargets` 灰化）、`VoteRecorder`（逐票記錄，草稿存 localStorage）、`PickSheet`（底部彈出單選：開槍/決鬥/自爆/警徽）、`PhaseBanner`/`StatusBar`/`SpeechTimer`/`Toast`。
@@ -61,7 +61,10 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - ✅ 擴充角色：**邱比特**（首夜連結情侶、殉情級聯走 applyDeath、跨陣營=第三方勝利 `winner.faction==='lovers'`）與**種狼**（夜晚感染刀口轉狼陣營、一局一次）。
   - 陣營/類別判斷一律走 `engine/src/alignment.ts` 的 `factionOf`/`clsOf`/`hasSkills`，**禁止直接查 ROLE_META**（感染會讓陣營在局中改變）。
   - 新規則開關：`lovesickCanShoot`、`seedWolfFirstNight`、`infectedKeepsSkills`（預設皆 false=主流規則）。
-  - 感染天亮生效（當夜查驗仍好人）；感染只擋刀不擋毒；`npm test` 72 綠。
+  - 感染天亮生效（當夜查驗仍好人）；感染只擋刀不擋毒。
+- ✅ 首頁進度（`gameProgress` selector + `games.progress_json` 快照）與**終局報表**（`engine/src/report.ts` 的
+  `buildGameReport(envelopes)`：增量 replay 擷取中間態——投票當下陣營、當夜結算名單、歷任警長）。
+  投票準確度以「投票當下」的 `factionOf` 計（與查驗語義一致）；第三方情侶不計分、邱比特照計。`npm test` 83 綠。
 - ⬜ 玩家端（SSE 廣播 + secret 過濾）仍為未來項目。
 
 ## 執行
