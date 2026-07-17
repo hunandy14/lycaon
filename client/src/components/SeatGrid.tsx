@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { CAUSE_LABEL, type GameState, type SeatId } from '@lycaon/engine';
+import { CAUSE_LABEL, loversAreThirdParty, type GameState, type SeatId } from '@lycaon/engine';
 import { factionColor, roleShort } from '../ui/roleStyle';
 
 interface Props {
@@ -25,7 +25,15 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
   for (const c of state.seerChecks) checks.set(c.target, c.result);
 
   const pendingDead = new Set(state.pendingDeaths.map((d) => d.seat));
-  const lovers = new Set(state.lovers ?? []);
+
+  const lovers = new Set<SeatId>(state.lovers ?? []);
+  // 跨陣營情侶 = 第三方：情侶 + 邱比特框成一組（粉色外框）
+  const thirdParty = new Set<SeatId>();
+  if (loversAreThirdParty(state)) {
+    for (const s of lovers) thirdParty.add(s);
+    const cupid = state.players.find((x) => x.role === 'cupid');
+    if (cupid) thirdParty.add(cupid.seat);
+  }
 
   return (
     <div className="seatgrid">
@@ -40,6 +48,7 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
             key={p.seat}
             className={[
               'seat',
+              thirdParty.has(p.seat) ? 'seat-third' : '',
               dead ? 'seat-dead' : '',
               chosen ? 'seat-chosen' : '',
               selectable && !disabled ? 'seat-tappable' : '',
@@ -56,7 +65,8 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
             {showRoles && <div className="seat-role">{roleShort(p.role)}</div>}
             {p.name && <div className="seat-name">{p.name}</div>}
             <div className="seat-marks">
-              {lovers.has(p.seat) && <span className="chip chip-lover">💘</span>}
+              {lovers.has(p.seat) && <span className="chip chip-lover">💘{thirdParty.size > 0 ? '三方' : ''}</span>}
+              {thirdParty.has(p.seat) && !lovers.has(p.seat) && <span className="chip chip-lover">三方</span>}
               {p.converted && <span className="chip chip-wolf">感染</span>}
               {check && <span className={`chip chip-${check}`}>{check === 'wolf' ? '查殺' : '金水'}</span>}
               {p.idiotRevealed && <span className="chip chip-idiot">白癡</span>}

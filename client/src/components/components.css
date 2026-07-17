@@ -30,6 +30,11 @@
 .seat-tappable:active {
   transform: scale(0.95);
 }
+/* 第三方情侶陣營（跨陣營情侶+邱比特）：粉色外框框成一組；選取狀態優先蓋過 */
+.seat-third {
+  border-color: #f472b6;
+  box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.35);
+}
 .seat-chosen {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 22%, var(--bg-elev2));
