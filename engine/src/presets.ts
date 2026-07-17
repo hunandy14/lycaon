@@ -3,7 +3,7 @@ import { ROLE_META, roleName } from './types/roles';
 import type { GameConfig } from './types/rules';
 
 export interface BoardPreset {
-  id: 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12';
+  id: 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'cupid12' | 'seedWolf12';
   name: string;
   playerCount: number;
   roles: RoleId[]; // 長度 = playerCount
@@ -30,6 +30,18 @@ export const BOARD_PRESETS: BoardPreset[] = [
     name: '白狼王騎士（12人）',
     playerCount: 12,
     roles: ['seer', 'witch', 'idiot', 'knight', ...villagers(4), ...wolves(3), 'whiteWolfKing'],
+  },
+  {
+    id: 'cupid12',
+    name: '邱比特（12人）',
+    playerCount: 12,
+    roles: ['seer', 'witch', 'hunter', 'cupid', ...villagers(4), ...wolves(4)],
+  },
+  {
+    id: 'seedWolf12',
+    name: '種狼（12人）',
+    playerCount: 12,
+    roles: ['seer', 'witch', 'hunter', 'idiot', ...villagers(4), ...wolves(3), 'seedWolf'],
   },
 ];
 

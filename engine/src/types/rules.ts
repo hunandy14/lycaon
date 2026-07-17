@@ -38,7 +38,7 @@ export const DEFAULT_RULES: RuleConfig = {
   infectedKeepsSkills: false,
 };
 
-export type PresetId = 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'custom';
+export type PresetId = 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'cupid12' | 'seedWolf12' | 'custom';
 
 export interface SeatConfig {
   seat: SeatId;

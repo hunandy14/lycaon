@@ -151,3 +151,17 @@ describe('夜晚行動驗證', () => {
     expect(s.seerChecks).toEqual([{ night: 1, target: 9, result: 'wolf' }]);
   });
 });
+
+describe('內建板子', () => {
+  it('所有 preset 都通過建局驗證', async () => {
+    const { BOARD_PRESETS, validateConfig, DEFAULT_RULES } = await import('../src');
+    for (const p of BOARD_PRESETS) {
+      const errors = validateConfig({
+        playerCount: p.playerCount,
+        seats: p.roles.map((role, i) => ({ seat: i + 1, role })),
+        rules: DEFAULT_RULES,
+      });
+      expect(errors, p.name).toEqual([]);
+    }
+  });
+});
