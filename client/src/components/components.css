@@ -584,3 +584,76 @@
 .timer.low {
   color: var(--danger);
 }
+
+/* ---------- 終局報表 ---------- */
+.hl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.hl-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.hl-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.pcard {
+  border-top: 1px solid var(--border);
+  padding: 10px 2px;
+}
+.pcard:first-of-type {
+  border-top: none;
+}
+.pcard-dead {
+  opacity: 0.65;
+}
+.pcard-seat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.rp-day,
+.rp-night {
+  border-top: 1px solid var(--border);
+  padding: 10px 2px;
+}
+.rp-day:first-of-type,
+.rp-night:first-of-type {
+  border-top: none;
+}
+.rp-day-label {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.rp-block {
+  margin: 8px 0;
+}
+.rp-block-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.rp-voteline {
+  padding: 1px 0;
+  font-variant-numeric: tabular-nums;
+}
+.rp-incident {
+  margin-top: 4px;
+}
+.rp-seer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

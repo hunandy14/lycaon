@@ -1,8 +1,10 @@
 import { factionOf, clsOf } from './alignment';
+import type { Faction } from './types/roles';
 import type { SeatId } from './types/rules';
-import type { GameState } from './types/state';
+import type { DayStage, GameState, Phase } from './types/state';
 import { currentNightStep } from './night/plan';
 import { activeCandidates, canVoteInElection } from './day/sheriff';
+import { phaseLabel } from './ctx';
 
 export interface DashboardStats {
   wolves: number;
@@ -18,6 +20,40 @@ export function dashboardStats(state: GameState): DashboardStats {
     gods: alive.filter((p) => clsOf(p) === 'god').length,
     villagers: alive.filter((p) => clsOf(p) === 'villager').length,
     aliveTotal: alive.length,
+  };
+}
+
+export const STAGE_LABEL: Record<DayStage, string> = {
+  sheriff: '警長競選',
+  announce: '公佈死訊',
+  speech: '發言・投票',
+  pk: 'PK 投票',
+  dayEnd: '等待天黑',
+};
+
+export interface GameProgress {
+  day: number;
+  phase: Phase['t'];
+  stage: DayStage | null;
+  /** 顯示用：「第 2 夜」「第 2 天・發言・投票」「開局」「終局」 */
+  label: string;
+  alive: number;
+  total: number;
+  winner: Faction | 'lovers' | null;
+}
+
+/** 對局進度摘要（首頁列表等輕量顯示用） */
+export function gameProgress(state: GameState): GameProgress {
+  const stage = state.phase.t === 'day' ? state.phase.stage : null;
+  const label = stage ? `${phaseLabel(state)}・${STAGE_LABEL[stage]}` : phaseLabel(state);
+  return {
+    day: state.day,
+    phase: state.phase.t,
+    stage,
+    label,
+    alive: state.players.filter((p) => p.alive).length,
+    total: state.players.length,
+    winner: state.winner?.faction ?? null,
   };
 }
 

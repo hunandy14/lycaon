@@ -14,4 +14,5 @@ export { buildDawnAnnouncement, expandedNightDeaths } from './announce';
 export { validate, type ValidationResult } from './validate';
 export { reduce, replay, initialState, EngineError } from './reduce';
 export * from './selectors';
+export * from './report';
 export { phaseLabel } from './ctx';

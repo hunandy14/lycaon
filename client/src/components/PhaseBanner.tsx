@@ -1,4 +1,4 @@
-import { phaseLabel, type GameState } from '@lycaon/engine';
+import { phaseLabel, STAGE_LABEL, type GameState } from '@lycaon/engine';
 
 interface Props {
   state: GameState;
@@ -8,14 +8,6 @@ interface Props {
   onRedo: () => void;
   canUndo: boolean;
 }
-
-const STAGE_LABEL: Record<string, string> = {
-  sheriff: '警長競選',
-  announce: '公佈死訊',
-  speech: '發言・投票',
-  pk: 'PK 投票',
-  dayEnd: '等待天黑',
-};
 
 export function PhaseBanner({ state, redoCount, busy, onUndo, onRedo, canUndo }: Props) {
   const isNight = state.phase.t === 'night';

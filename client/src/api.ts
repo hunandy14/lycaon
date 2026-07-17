@@ -1,4 +1,4 @@
-import type { EventEnvelope, GameConfig, GameEvent } from '@lycaon/engine';
+import type { EventEnvelope, GameConfig, GameEvent, GameProgress } from '@lycaon/engine';
 
 export interface GameSummary {
   id: string;
@@ -6,6 +6,7 @@ export interface GameSummary {
   status: 'active' | 'finished' | 'aborted';
   playerCount: number;
   presetId: string;
+  progress: GameProgress | null;
   createdAt: string;
   updatedAt: string;
 }

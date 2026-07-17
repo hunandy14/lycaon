@@ -8,6 +8,21 @@ const STATUS_LABEL: Record<GameSummary['status'], string> = {
   aborted: '已中止',
 };
 
+const WIN_STYLE: Record<string, { emoji: string; label: string; color: string }> = {
+  good: { emoji: '✋', label: '好人勝利', color: 'var(--good)' },
+  wolf: { emoji: '🐺', label: '狼人勝利', color: 'var(--wolf)' },
+  lovers: { emoji: '💘', label: '情侶勝利', color: '#f472b6' },
+};
+
+/** 進行中對局的進度短句：「🌙 第 2 夜 · 存活 8/12」 */
+function progressText(g: GameSummary): string {
+  const p = g.progress;
+  if (!p) return `${g.playerCount} 人`;
+  if (p.phase === 'setup') return `準備開局 · ${p.total} 人`;
+  const icon = p.phase === 'night' ? '🌙 ' : p.phase === 'day' ? '☀️ ' : '';
+  return `${icon}${p.label} · 存活 ${p.alive}/${p.total}`;
+}
+
 export function HomePage() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +66,7 @@ export function HomePage() {
               <div className="row" style={{ alignItems: 'center' }}>
                 <div className="grow">
                   <div style={{ fontWeight: 700 }}>{g.title}</div>
-                  <div className="faint small">{g.playerCount} 人 · {fmtDate(g.updatedAt)}</div>
+                  <div className="faint small">{progressText(g)} · {fmtDate(g.updatedAt)}</div>
                 </div>
                 <span className="btn btn-primary btn-sm">繼續主持 →</span>
               </div>
@@ -63,19 +78,29 @@ export function HomePage() {
       {history.length > 0 && (
         <section style={{ marginTop: 24 }}>
           <h2 className="small muted" style={{ marginBottom: 8 }}>歷史對局</h2>
-          {history.map((g) => (
-            <div key={g.id} className="card" style={{ marginBottom: 8, padding: 12 }}>
-              <div className="row" style={{ alignItems: 'center' }}>
-                <Link to={`/game/${g.id}/timeline`} className="grow" style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div style={{ fontWeight: 600 }}>{g.title}</div>
-                  <div className="faint small">
-                    <span className="pill" style={{ padding: '1px 8px' }}>{STATUS_LABEL[g.status]}</span> {g.playerCount} 人 · {fmtDate(g.createdAt)}
-                  </div>
-                </Link>
-                <button className="btn btn-ghost btn-sm faint" onClick={() => remove(g.id, g.title)}>刪除</button>
+          {history.map((g) => {
+            const win = g.progress?.winner ? WIN_STYLE[g.progress.winner] : undefined;
+            return (
+              <div key={g.id} className="card" style={{ marginBottom: 8, padding: 12 }}>
+                <div className="row" style={{ alignItems: 'center' }}>
+                  <Link to={`/game/${g.id}/report`} className="grow" style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ fontWeight: 600 }}>{g.title}</div>
+                    <div className="faint small">
+                      {win ? (
+                        <span className="pill" style={{ padding: '1px 8px', borderColor: win.color, color: win.color }}>
+                          {win.emoji} {win.label}
+                        </span>
+                      ) : (
+                        <span className="pill" style={{ padding: '1px 8px' }}>{STATUS_LABEL[g.status]}</span>
+                      )}{' '}
+                      {g.playerCount} 人{g.progress && g.progress.day > 0 ? ` · ${g.progress.day} 天` : ''} · {fmtDate(g.createdAt)}
+                    </div>
+                  </Link>
+                  <button className="btn btn-ghost btn-sm faint" onClick={() => remove(g.id, g.title)}>刪除</button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       )}
 

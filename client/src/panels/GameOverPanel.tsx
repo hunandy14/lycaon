@@ -1,3 +1,4 @@
+import { Link, useParams } from 'react-router-dom';
 import { ROLE_META } from '@lycaon/engine';
 import { factionColor } from '../ui/roleStyle';
 import type { PanelProps } from './types';
@@ -9,6 +10,7 @@ const WIN_STYLE = {
 } as const;
 
 export function GameOverPanel({ state }: PanelProps) {
+  const { id = '' } = useParams();
   const win = state.winner;
   const ws = WIN_STYLE[win?.faction ?? 'good'];
 
@@ -27,6 +29,10 @@ export function GameOverPanel({ state }: PanelProps) {
         <h1 style={{ fontSize: '1.8rem', color: ws.color }}>{ws.title}</h1>
         {win && <p className="muted" style={{ marginTop: 6 }}>{win.reason}</p>}
       </div>
+
+      <Link to={`/game/${id}/report`} className="btn btn-primary btn-lg btn-block" style={{ marginTop: 14 }}>
+        📊 查看終局報表
+      </Link>
 
       <div className="panel" style={{ marginTop: 14 }}>
         <div className="panel-title">身分公開</div>

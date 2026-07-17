@@ -33,7 +33,7 @@ export function TimelinePage() {
       <header className="row" style={{ alignItems: 'center', padding: '14px 0' }}>
         <Link to={`/game/${id}`} className="btn btn-ghost btn-sm">← 返回</Link>
         <h2 className="grow center" style={{ fontSize: '1.1rem' }}>時間軸</h2>
-        <span style={{ width: 60 }} />
+        <Link to={`/game/${id}/report`} className="btn btn-ghost btn-sm">📊 報表</Link>
       </header>
 
       <div className="timeline">

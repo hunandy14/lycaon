@@ -7,12 +7,14 @@ import { HomePage } from './pages/HomePage';
 import { NewGamePage } from './pages/NewGamePage';
 import { GamePage } from './pages/GamePage';
 import { TimelinePage } from './pages/TimelinePage';
+import { ReportPage } from './pages/ReportPage';
 
 const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
   { path: '/new', element: <NewGamePage /> },
   { path: '/game/:id', element: <GamePage /> },
   { path: '/game/:id/timeline', element: <TimelinePage /> },
+  { path: '/game/:id/report', element: <ReportPage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -1,16 +1,18 @@
 import { Hono } from 'hono';
 import { nanoid } from 'nanoid';
-import type { GameConfig, GameEvent } from '@lycaon/engine';
-import { replay, validate, validateConfig, BOARD_PRESETS } from '@lycaon/engine';
+import type { GameConfig, GameEvent, GameProgress } from '@lycaon/engine';
+import { replay, validate, validateConfig, gameProgress, BOARD_PRESETS } from '@lycaon/engine';
 import type { EventStore } from '../db';
 
-/** 由重播結果同步 games.status（winner → finished；GAME_ABORTED → aborted） */
-function syncStatus(store: EventStore, gameId: string): void {
+/** 由重播結果同步 games.status（winner → finished；GAME_ABORTED → aborted）與進度快照 */
+function syncStatus(store: EventStore, gameId: string, at?: string): GameProgress | null {
   const envelopes = store.loadEnvelopes(gameId);
-  if (envelopes.length === 0) return;
+  if (envelopes.length === 0) return null;
   const state = replay(envelopes);
   const status = state.winner ? 'finished' : state.phase.t === 'ended' ? 'aborted' : 'active';
-  store.updateGameStatus(gameId, status, new Date().toISOString());
+  const progress = gameProgress(state);
+  store.updateGameStatus(gameId, status, JSON.stringify(progress), at ?? new Date().toISOString());
+  return progress;
 }
 
 export function gamesRoutes(store: EventStore): Hono {
@@ -19,12 +21,17 @@ export function gamesRoutes(store: EventStore): Hono {
   app.get('/', (c) => {
     const games = store.listGames().map((g) => {
       const config = JSON.parse(g.config_json) as GameConfig;
+      // 舊局沒有快照：懶補一次（重播後存回，維持原 updated_at），之後走快取
+      const progress = g.progress_json
+        ? (JSON.parse(g.progress_json) as GameProgress)
+        : syncStatus(store, g.id, g.updated_at);
       return {
         id: g.id,
         title: g.title,
         status: g.status,
         playerCount: config.playerCount,
         presetId: config.presetId ?? 'custom',
+        progress,
         createdAt: g.created_at,
         updatedAt: g.updated_at,
       };
@@ -43,6 +50,7 @@ export function gamesRoutes(store: EventStore): Hono {
     const title = config.title || `${preset?.name ?? `${config.playerCount} 人自訂局`}`;
     store.createGame(id, title, JSON.stringify(config), now);
     store.append(id, { type: 'GAME_CREATED', config }, now);
+    syncStatus(store, id);
     return c.json({ id }, 201);
   });
 

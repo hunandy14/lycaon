@@ -8,6 +8,8 @@ export interface GameRow {
   title: string;
   status: 'active' | 'finished' | 'aborted';
   config_json: string;
+  /** 引擎 gameProgress 快照（append/undo/redo 時更新；舊局為 NULL，列表時懶補） */
+  progress_json: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +38,10 @@ export function openDb(path: string): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_events_live ON events (game_id, undone, seq);
   `);
+  const cols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'progress_json')) {
+    db.exec(`ALTER TABLE games ADD COLUMN progress_json TEXT`);
+  }
   return db;
 }
 
@@ -120,7 +126,9 @@ export class EventStore {
     return this.headSeq(gameId);
   }
 
-  updateGameStatus(gameId: string, status: GameRow['status'], now: string): void {
-    this.db.prepare(`UPDATE games SET status = ?, updated_at = ? WHERE id = ?`).run(status, now, gameId);
+  updateGameStatus(gameId: string, status: GameRow['status'], progressJson: string, now: string): void {
+    this.db
+      .prepare(`UPDATE games SET status = ?, progress_json = ?, updated_at = ? WHERE id = ?`)
+      .run(status, progressJson, now, gameId);
   }
 }
