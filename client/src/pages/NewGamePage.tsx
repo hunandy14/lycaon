@@ -16,31 +16,78 @@ import { api } from '../api';
 import { Toast } from '../components/Toast';
 import { factionColor } from '../ui/roleStyle';
 
-type Step = 0 | 1 | 2 | 3;
+type Step = 'board' | 'pool' | 'rules' | 'seats' | 'confirm';
+const STEPS: Step[] = ['board', 'pool', 'rules', 'seats', 'confirm'];
+const STEP_LABEL: Record<Step, string> = { board: '板子', pool: '角色池', rules: '規則', seats: '座位', confirm: '確認' };
+
+type Pool = Partial<Record<RoleId, number>>;
+
+/** 只能一張的角色（平民與普通狼人可複數） */
+const MULTI_ROLES: RoleId[] = ['villager', 'werewolf'];
+const GROUPS: { label: string; roles: RoleId[] }[] = [
+  { label: '神職', roles: ['seer', 'witch', 'hunter', 'idiot', 'guard', 'knight', 'cupid'] },
+  { label: '平民', roles: ['villager'] },
+  { label: '狼人陣營', roles: ['werewolf', 'blackWolfKing', 'whiteWolfKing', 'seedWolf'] },
+];
 
 export function NewGamePage() {
   const nav = useNavigate();
-  const [step, setStep] = useState<Step>(0);
+  const [step, setStep] = useState<Step>('board');
   const [presetId, setPresetId] = useState<PresetId>('standard12');
-  const [playerCount, setPlayerCount] = useState(12);
-  const [seats, setSeats] = useState<SeatConfig[]>(() => presetSeats('standard12', 12));
+  const [pool, setPool] = useState<Pool>(() => poolFromRoles(BOARD_PRESETS[0]!.roles));
+  const [seats, setSeats] = useState<SeatConfig[]>([]);
   const [rules, setRules] = useState<RuleConfig>({ ...DEFAULT_RULES });
   const [title, setTitle] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const errors = useMemo(() => validateConfig({ playerCount, seats, rules }), [playerCount, seats, rules]);
+  const playerCount = useMemo(() => Object.values(pool).reduce((a, b) => a + (b ?? 0), 0), [pool]);
+  const errors = useMemo(
+    () => (seats.length > 0 ? validateConfig({ playerCount, seats, rules }) : []),
+    [playerCount, seats, rules],
+  );
+  // 角色池本身的即時驗證（用池子展開的虛擬座位跑同一套引擎驗證）
+  const poolErrors = useMemo(
+    () => validateConfig({ playerCount, seats: seatsFromPool(pool, []), rules }),
+    [playerCount, pool, rules],
+  );
 
-  const choosePreset = (id: PresetId, count: number) => {
+  const goBack = () => {
+    const i = STEPS.indexOf(step);
+    if (i === 0) return nav('/');
+    setStep(STEPS[i - 1]!);
+  };
+
+  const choosePreset = (id: PresetId) => {
     setPresetId(id);
-    setPlayerCount(count);
-    setSeats(presetSeats(id, count));
+    const preset = BOARD_PRESETS.find((p) => p.id === id);
+    setPool(preset ? poolFromRoles(preset.roles) : {});
+  };
+
+  const enterSeats = () => {
+    // 依角色池重新產生座位（保留已輸入的名字）
+    setSeats((prev) => seatsFromPool(pool, prev));
+    setStep('seats');
   };
 
   const setSeatRole = (seat: number, role: RoleId) =>
     setSeats((prev) => prev.map((s) => (s.seat === seat ? { ...s, role } : s)));
   const setSeatName = (seat: number, name: string) =>
     setSeats((prev) => prev.map((s) => (s.seat === seat ? { ...s, name: name || undefined } : s)));
+
+  // 座位角色與角色池的差異（軟性提醒，不擋流程——實體發牌輸入錯最常見的徵兆）
+  const poolMismatch = useMemo(() => {
+    if (seats.length === 0) return null;
+    const seatTally = new Map<RoleId, number>();
+    for (const s of seats) seatTally.set(s.role, (seatTally.get(s.role) ?? 0) + 1);
+    const diffs: string[] = [];
+    for (const r of ALL_ROLES) {
+      const want = pool[r] ?? 0;
+      const got = seatTally.get(r) ?? 0;
+      if (want !== got) diffs.push(`${ROLE_META[r].name} ${got}/${want}`);
+    }
+    return diffs.length > 0 ? diffs.join('、') : null;
+  }, [seats, pool]);
 
   const submit = async () => {
     if (errors.length > 0) return setErr(errors[0]!);
@@ -57,24 +104,18 @@ export function NewGamePage() {
 
   return (
     <div className="app">
-      <WizardHeader step={step} onBack={() => (step === 0 ? nav('/') : setStep((step - 1) as Step))} />
+      <WizardHeader step={step} onBack={goBack} />
 
-      {step === 0 && (
+      {step === 'board' && (
         <section>
-          <h2 style={{ marginBottom: 12 }}>選擇板子</h2>
+          <h2 style={{ marginBottom: 4 }}>選擇板子</h2>
+          <p className="muted small" style={{ marginBottom: 12 }}>標準板子配置平衡；人數不同或想亂玩，下一步可以自由調整角色池。</p>
           {BOARD_PRESETS.map((p) => (
             <button
               key={p.id}
               className="card"
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                marginBottom: 10,
-                borderColor: presetId === p.id ? 'var(--accent)' : 'var(--border)',
-                background: presetId === p.id ? 'color-mix(in srgb, var(--accent) 12%, var(--bg-card))' : 'var(--bg-card)',
-              }}
-              onClick={() => choosePreset(p.id, p.playerCount)}
+              style={cardStyle(presetId === p.id)}
+              onClick={() => choosePreset(p.id)}
             >
               <div style={{ fontWeight: 700, marginBottom: 6 }}>{p.name}</div>
               <div className="row row-wrap" style={{ gap: 4 }}>
@@ -87,57 +128,41 @@ export function NewGamePage() {
             </button>
           ))}
 
-          <button
-            className="card"
-            style={{
-              display: 'block',
-              width: '100%',
-              textAlign: 'left',
-              borderColor: presetId === 'custom' ? 'var(--accent)' : 'var(--border)',
-              background: presetId === 'custom' ? 'color-mix(in srgb, var(--accent) 12%, var(--bg-card))' : 'var(--bg-card)',
-            }}
-            onClick={() => {
-              setPresetId('custom');
-              setSeats(presetSeats('custom', playerCount));
-            }}
-          >
+          <button className="card" style={cardStyle(presetId === 'custom')} onClick={() => choosePreset('custom')}>
             <div style={{ fontWeight: 700 }}>自訂配置</div>
-            <div className="muted small">自由設定人數與每個角色</div>
+            <div className="muted small">從空白角色池自由搭，全神職娛樂局也行（不保證平衡）</div>
           </button>
 
-          {presetId === 'custom' && (
-            <div className="card" style={{ marginTop: 10 }}>
-              <label className="small muted">人數：{playerCount}</label>
-              <input
-                type="range"
-                min={6}
-                max={18}
-                value={playerCount}
-                style={{ width: '100%' }}
-                onChange={(e) => {
-                  const n = Number(e.target.value);
-                  setPlayerCount(n);
-                  setSeats(presetSeats('custom', n));
-                }}
-              />
-            </div>
-          )}
-
-          <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }} onClick={() => setStep(1)}>
-            下一步：規則設定
+          <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }} onClick={() => setStep('pool')}>
+            下一步：角色池
           </button>
         </section>
       )}
 
-      {step === 1 && (
-        <RulesStep rules={rules} setRules={setRules} onNext={() => setStep(2)} />
+      {step === 'pool' && (
+        <PoolStep
+          pool={pool}
+          setPool={setPool}
+          playerCount={playerCount}
+          poolErrors={poolErrors}
+          isPreset={presetId !== 'custom'}
+          onNext={() => setStep('rules')}
+        />
       )}
 
-      {step === 2 && (
+      {step === 'rules' && <RulesStep rules={rules} setRules={setRules} onNext={enterSeats} />}
+
+      {step === 'seats' && (
         <section>
           <h2 style={{ marginBottom: 4 }}>輸入座位角色</h2>
           <p className="muted small" style={{ marginBottom: 12 }}>依實體發牌結果，設定每個座位拿到的角色。</p>
-          <RolePool seats={seats} />
+          <div className="row row-wrap" style={{ gap: 4 }}>
+            {roleTally(seats.map((s) => s.role)).map(([role, n]) => (
+              <span key={role} className="pill" style={{ color: factionColor(role) }}>
+                {ROLE_META[role].name} ×{n}
+              </span>
+            ))}
+          </div>
           <div style={{ marginTop: 12 }}>
             {seats.map((s) => (
               <div key={s.seat} className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
@@ -163,19 +188,24 @@ export function NewGamePage() {
               </div>
             ))}
           </div>
+          {poolMismatch && (
+            <div className="warn-card" style={{ marginTop: 12 }}>
+              ⚠️ 座位角色與角色池不一致（目前/應有）：{poolMismatch}。若是刻意改動可忽略。
+            </div>
+          )}
           {errors.length > 0 && <div className="warn-card" style={{ marginTop: 12 }}>{errors[0]}</div>}
           <button
             className="btn btn-primary btn-lg btn-block"
             style={{ marginTop: 12 }}
             disabled={errors.length > 0}
-            onClick={() => setStep(3)}
+            onClick={() => setStep('confirm')}
           >
             下一步：確認
           </button>
         </section>
       )}
 
-      {step === 3 && (
+      {step === 'confirm' && (
         <section>
           <h2 style={{ marginBottom: 12 }}>確認開局</h2>
           <div className="card" style={{ marginBottom: 12 }}>
@@ -185,6 +215,7 @@ export function NewGamePage() {
               style={{ width: '100%', padding: 12, borderRadius: 8, background: 'var(--bg-elev2)', color: 'var(--text)', border: '1px solid var(--border)', marginBottom: 12 }}
               onChange={(e) => setTitle(e.target.value)}
             />
+            <div className="muted small" style={{ marginBottom: 6 }}>{playerCount} 人</div>
             <div className="row row-wrap" style={{ gap: 4 }}>
               {roleTally(seats.map((s) => s.role)).map(([role, n]) => (
                 <span key={role} className="pill" style={{ color: factionColor(role) }}>
@@ -206,16 +237,96 @@ export function NewGamePage() {
   );
 }
 
-function WizardHeader({ step, onBack }: { step: number; onBack: () => void }) {
-  const labels = ['板子', '規則', '角色', '確認'];
+/** 角色池：每個角色 +/- 計數，人數自動加總（標準板 10/11/13 人調整、娛樂局亂搭都在這裡） */
+function PoolStep({
+  pool,
+  setPool,
+  playerCount,
+  poolErrors,
+  isPreset,
+  onNext,
+}: {
+  pool: Pool;
+  setPool: (p: Pool) => void;
+  playerCount: number;
+  poolErrors: string[];
+  isPreset: boolean;
+  onNext: () => void;
+}) {
+  const bump = (role: RoleId, delta: number) => {
+    const max = MULTI_ROLES.includes(role) ? 18 : 1;
+    const next = Math.max(0, Math.min(max, (pool[role] ?? 0) + delta));
+    setPool({ ...pool, [role]: next });
+  };
+
+  const wolves = GROUPS[2]!.roles.reduce((a, r) => a + (pool[r] ?? 0), 0);
+  const gods = GROUPS[0]!.roles.reduce((a, r) => a + (pool[r] ?? 0), 0);
+  const villagers = pool.villager ?? 0;
+
+  return (
+    <section>
+      <h2 style={{ marginBottom: 4 }}>角色池</h2>
+      <p className="muted small" style={{ marginBottom: 12 }}>
+        {isPreset
+          ? '人數不是 12？慣例是先增減平民、再增減狼人，其他照舊。'
+          : '自由搭配，人數自動加總（引擎只要求至少一狼一好人）。'}
+      </p>
+
+      <div className="row row-wrap" style={{ gap: 6, marginBottom: 12 }}>
+        <span className="stat">總 <b>{playerCount}</b> 人</span>
+        <span className="stat stat-god">神 <b>{gods}</b></span>
+        <span className="stat stat-villager">民 <b>{villagers}</b></span>
+        <span className="stat stat-wolf">狼 <b>{wolves}</b></span>
+      </div>
+
+      {GROUPS.map((g) => (
+        <div key={g.label} style={{ marginBottom: 12 }}>
+          <h3 className="small muted" style={{ marginBottom: 6 }}>{g.label}</h3>
+          <div className="card" style={{ padding: '4px 12px' }}>
+            {g.roles.map((role) => (
+              <div key={role} className="row" style={{ alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontWeight: 600, color: factionColor(role) }}>{ROLE_META[role].name}</span>
+                <span className="spacer" />
+                <button className="btn btn-sm" style={{ minWidth: 44 }} disabled={(pool[role] ?? 0) === 0} onClick={() => bump(role, -1)}>
+                  −
+                </button>
+                <span style={{ width: 36, textAlign: 'center', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                  {pool[role] ?? 0}
+                </span>
+                <button
+                  className="btn btn-sm"
+                  style={{ minWidth: 44 }}
+                  disabled={!MULTI_ROLES.includes(role) && (pool[role] ?? 0) >= 1}
+                  onClick={() => bump(role, 1)}
+                >
+                  ＋
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {poolErrors.length > 0 && <div className="warn-card">{poolErrors[0]}</div>}
+      <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 8 }} disabled={poolErrors.length > 0} onClick={onNext}>
+        下一步：規則設定（{playerCount} 人）
+      </button>
+    </section>
+  );
+}
+
+function WizardHeader({ step, onBack }: { step: Step; onBack: () => void }) {
+  const idx = STEPS.indexOf(step);
   return (
     <header style={{ padding: '14px 0' }}>
       <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
         <button className="btn btn-ghost btn-sm" onClick={onBack}>← 返回</button>
+        <span className="spacer" />
+        <span className="faint small">{STEP_LABEL[step]}</span>
       </div>
       <div className="step-dots">
-        {labels.map((_, i) => (
-          <div key={i} className={`step-dot ${i < step ? 'done' : ''} ${i === step ? 'active' : ''}`} />
+        {STEPS.map((s, i) => (
+          <div key={s} className={`step-dot ${i < idx ? 'done' : ''} ${i === idx ? 'active' : ''}`} />
         ))}
       </div>
     </header>
@@ -295,18 +406,6 @@ function SelectRow({ label, value, options, onChange }: { label: string; value: 
   );
 }
 
-function RolePool({ seats }: { seats: SeatConfig[] }) {
-  return (
-    <div className="row row-wrap" style={{ gap: 4 }}>
-      {roleTally(seats.map((s) => s.role)).map(([role, n]) => (
-        <span key={role} className="pill" style={{ color: factionColor(role) }}>
-          {ROLE_META[role].name} ×{n}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function RuleSummary({ rules }: { rules: RuleConfig }) {
   const items = [
     `警長：${rules.sheriffEnabled ? '有' : '無'}`,
@@ -324,15 +423,28 @@ function RuleSummary({ rules }: { rules: RuleConfig }) {
 }
 
 // ---- helpers ----
-function presetSeats(id: PresetId, count: number): SeatConfig[] {
-  const preset = BOARD_PRESETS.find((p) => p.id === id);
-  if (preset) return preset.roles.map((role, i) => ({ seat: i + 1, role }));
-  // 自訂：預設半狼半民的合理起手，GM 再調整
-  const wolves = Math.max(1, Math.floor(count / 3));
-  return Array.from({ length: count }, (_, i) => ({
-    seat: i + 1,
-    role: (i === 0 ? 'seer' : i === 1 ? 'witch' : i >= count - wolves ? 'werewolf' : 'villager') as RoleId,
-  }));
+function cardStyle(selected: boolean): React.CSSProperties {
+  return {
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    marginBottom: 10,
+    borderColor: selected ? 'var(--accent)' : 'var(--border)',
+    background: selected ? 'color-mix(in srgb, var(--accent) 12%, var(--bg-card))' : 'var(--bg-card)',
+  };
+}
+
+function poolFromRoles(roles: RoleId[]): Pool {
+  const pool: Pool = {};
+  for (const r of roles) pool[r] = (pool[r] ?? 0) + 1;
+  return pool;
+}
+
+/** 角色池展開成座位（依 ALL_ROLES 順序）；盡量保留既有座位名字 */
+function seatsFromPool(pool: Pool, prev: SeatConfig[]): SeatConfig[] {
+  const roles: RoleId[] = [];
+  for (const r of ALL_ROLES) for (let i = 0; i < (pool[r] ?? 0); i++) roles.push(r);
+  return roles.map((role, i) => ({ seat: i + 1, role, name: prev[i]?.name }));
 }
 
 function roleTally(roles: RoleId[]): [RoleId, number][] {
