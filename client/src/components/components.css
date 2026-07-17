@@ -586,50 +586,208 @@
 }
 
 /* ---------- 終局報表 ---------- */
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 10px;
+}
+.kpi {
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+}
+
+/* 亮點小徽章 */
 .hl-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 .hl-card {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 6px 9px;
 }
 .hl-title {
   font-weight: 700;
-  margin-bottom: 2px;
+  font-size: 0.8rem;
 }
-.pcard {
-  border-top: 1px solid var(--border);
-  padding: 10px 2px;
+.hl-detail {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  margin-top: 1px;
 }
-.pcard:first-of-type {
-  border-top: none;
+
+/* 全局命運圖 */
+.fate-wrap {
+  overflow-x: auto;
+  margin: 0 -4px;
 }
-.pcard-dead {
-  opacity: 0.65;
+.fate {
+  border-collapse: collapse;
+  width: 100%;
 }
-.pcard-seat {
+.fate th,
+.fate td {
+  padding: 0;
+  text-align: center;
+}
+.fate thead th {
+  font-size: 0.62rem;
+  color: var(--text-faint);
+  font-weight: 600;
+  padding: 2px 1px 4px;
+}
+.fate tbody td {
+  min-width: 26px;
+  height: 30px;
+  border: 1px solid rgba(46, 52, 70, 0.55);
+  font-size: 10px;
+  line-height: 1;
+  background: var(--bg);
+  letter-spacing: -1px;
+}
+.fate-player {
+  position: sticky;
+  left: 0;
+  background: var(--bg-card);
+  text-align: left !important;
+  padding: 1px 6px 1px 2px !important;
+  z-index: 2;
+  min-width: 84px;
+}
+.fp-line1 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+.fp-name {
+  font-size: 0.6rem;
+  color: var(--text-faint);
+}
+.fate-death {
+  background: rgba(239, 68, 68, 0.22) !important;
+}
+.fate-gone {
+  background: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255, 255, 255, 0.035) 3px 6px);
+  opacity: 0.35;
+}
+.fate-check-wolf {
+  box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.65);
+}
+.fate-check-good {
+  box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.55);
+}
+.fate-acc {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0 4px !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fate-legend {
+  font-size: 0.66rem;
+  color: var(--text-faint);
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
+/* 勢力消長 */
+.tide-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* 票型橫條 */
+.vb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.vb-target {
+  min-width: 40px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vb-track {
+  flex: 1;
+  height: 13px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.vb-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent-dim);
+}
+.vb-top {
+  background: var(--accent);
+}
+.vb-num {
+  min-width: 26px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.vb-voters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 3px 0 1px 46px;
+}
+.vchip {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
   background: var(--bg);
   border: 1px solid var(--border);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.rp-day,
-.rp-night {
+.vchip-good {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: var(--good);
+}
+.vchip-wolf {
+  border-color: rgba(239, 68, 68, 0.6);
+  color: var(--wolf);
+}
+.vchip-third {
+  border-color: rgba(244, 114, 182, 0.6);
+  color: #f472b6;
+}
+.vb-outcome {
+  font-size: 0.78rem;
+  margin-top: 5px;
+}
+
+/* 白天分組（沿用） */
+.rp-day {
   border-top: 1px solid var(--border);
   padding: 10px 2px;
 }
-.rp-day:first-of-type,
-.rp-night:first-of-type {
+.rp-day:first-of-type {
   border-top: none;
 }
 .rp-day-label {
@@ -645,15 +803,37 @@
   color: var(--text-dim);
   margin-bottom: 2px;
 }
-.rp-voteline {
-  padding: 1px 0;
-  font-variant-numeric: tabular-nums;
-}
 .rp-incident {
-  margin-top: 4px;
+  margin-top: 5px;
 }
-.rp-seer {
+
+/* 夜晚一行復盤 */
+.ns-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+  font-size: 0.75rem;
+}
+.ns-row:first-of-type {
+  border-top: none;
+}
+.ns-b {
+  font-weight: 800;
+  min-width: 34px;
+}
+.ns-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.ns-result {
+  width: 100%;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  padding-left: 38px;
 }
