@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { ROLE_META } from '@lycaon/engine';
+import { CAUSE_LABEL, ROLE_META } from '@lycaon/engine';
 import { factionColor } from '../ui/roleStyle';
 import type { PanelProps } from './types';
 
@@ -47,7 +47,8 @@ export function GameOverPanel({ state }: PanelProps) {
               {state.lovers?.includes(p.seat) && <span>💘</span>}
               {p.name && <span className="faint small">{p.name}</span>}
               <span className="spacer" />
-              <span className="small muted">{p.alive ? '存活' : '出局'}</span>
+              {!p.alive && p.death && <span className="small faint">{CAUSE_LABEL[p.death.cause]}</span>}
+              <span className={`st-pill ${p.alive ? 'st-alive' : 'st-dead'}`}>{p.alive ? '存活' : '✕ 出局'}</span>
               {state.sheriff === p.seat && <span className="seat-badge" style={{ position: 'static' }}>★</span>}
             </div>
           ))}

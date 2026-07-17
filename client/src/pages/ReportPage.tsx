@@ -360,7 +360,7 @@ function TideChart({ report, beats }: { report: GameReport; beats: Beat[] }) {
 function DayBlock({ d, players }: { d: GameReport['days'][number]; players: PlayerReport[] }) {
   return (
     <div className="rp-day">
-      <div className="rp-day-label">第 {d.day} 天</div>
+      <div className="rp-day-label">☀️ 第 {d.day} 天</div>
       {d.sheriff && (
         <div className="rp-block">
           <div className="rp-block-title">警長競選</div>
