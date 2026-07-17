@@ -10,6 +10,10 @@ export interface GameRow {
   config_json: string;
   /** 引擎 gameProgress 快照（append/undo/redo 時更新；舊局為 NULL，列表時懶補） */
   progress_json: string | null;
+  /** 同樂模式邀請 token（一局一個，開啟時生成後固定） */
+  share_token: string | null;
+  /** ShareSettings JSON（null = 從未開過同樂模式） */
+  share_json: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,9 +43,12 @@ export function openDb(path: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_events_live ON events (game_id, undone, seq);
   `);
   const cols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
-  if (!cols.some((c) => c.name === 'progress_json')) {
-    db.exec(`ALTER TABLE games ADD COLUMN progress_json TEXT`);
-  }
+  const addCol = (name: string) => {
+    if (!cols.some((c) => c.name === name)) db.exec(`ALTER TABLE games ADD COLUMN ${name} TEXT`);
+  };
+  addCol('progress_json');
+  addCol('share_token');
+  addCol('share_json');
   return db;
 }
 
@@ -130,5 +137,13 @@ export class EventStore {
     this.db
       .prepare(`UPDATE games SET status = ?, progress_json = ?, updated_at = ? WHERE id = ?`)
       .run(status, progressJson, now, gameId);
+  }
+
+  updateShare(gameId: string, token: string | null, shareJson: string): void {
+    this.db.prepare(`UPDATE games SET share_token = ?, share_json = ? WHERE id = ?`).run(token, shareJson, gameId);
+  }
+
+  getGameByShareToken(token: string): GameRow | undefined {
+    return this.db.prepare(`SELECT * FROM games WHERE share_token = ?`).get(token) as GameRow | undefined;
   }
 }

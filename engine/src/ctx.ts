@@ -21,7 +21,7 @@ export function phaseLabel(state: GameState): string {
   }
 }
 
-export function pushLog(ctx: Ctx, text: string, secret = false): void {
+export function pushLog(ctx: Ctx, text: string, secret = false, kind?: 'ballots' | 'note'): void {
   ctx.state.log.push({
     seq: ctx.seq,
     at: ctx.at,
@@ -29,6 +29,7 @@ export function pushLog(ctx: Ctx, text: string, secret = false): void {
     phase: phaseLabel(ctx.state),
     text,
     secret,
+    ...(kind ? { kind } : {}),
   });
 }
 

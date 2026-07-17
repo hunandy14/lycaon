@@ -96,7 +96,8 @@ export function applyDeath(ctx: Ctx, seat: SeatId, cause: DeathCause, poisoned: 
       const partner = player(state, partnerSeat);
       const partnerPending = state.pendingDeaths.some((d) => d.seat === partnerSeat);
       if (partner.alive && !partnerPending) {
-        pushLog(ctx, `💔 ${seatLabel(state, partnerSeat)}殉情`, true);
+        // 夜裡殉情併入天亮死亡名單（不公佈細節）；白天殉情是全場親見的公開死亡
+        pushLog(ctx, `💔 ${seatLabel(state, partnerSeat)}殉情出局`, during === 'night');
         applyDeath(ctx, partnerSeat, 'lovesick', false, during);
       }
     }

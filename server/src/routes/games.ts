@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { nanoid } from 'nanoid';
-import type { GameConfig, GameEvent, GameProgress } from '@lycaon/engine';
-import { replay, validate, validateConfig, gameProgress, BOARD_PRESETS } from '@lycaon/engine';
+import type { GameConfig, GameEvent, GameProgress, ShareSettings } from '@lycaon/engine';
+import { replay, validate, validateConfig, gameProgress, BOARD_PRESETS, DEFAULT_SHARE } from '@lycaon/engine';
 import type { EventStore } from '../db';
+import { notify } from '../live';
+import { parseShare } from './watch';
 
 /** 由重播結果同步 games.status（winner → finished；GAME_ABORTED → aborted）與進度快照 */
 function syncStatus(store: EventStore, gameId: string, at?: string): GameProgress | null {
@@ -91,6 +93,7 @@ export function gamesRoutes(store: EventStore): Hono {
     const now = new Date().toISOString();
     const seq = store.append(id, body.event, now);
     syncStatus(store, id);
+    notify(id);
     return c.json({ seq, envelope: { seq, at: now, event: body.event } });
   });
 
@@ -101,6 +104,7 @@ export function gamesRoutes(store: EventStore): Hono {
     try {
       const headSeq = store.undo(id, body.toSeq);
       syncStatus(store, id);
+      notify(id);
       return c.json({ headSeq, redoCount: store.redoCount(id) });
     } catch (e) {
       return c.json({ error: (e as Error).message }, 400);
@@ -113,10 +117,30 @@ export function gamesRoutes(store: EventStore): Hono {
     try {
       const headSeq = store.redo(id);
       syncStatus(store, id);
+      notify(id);
       return c.json({ headSeq, redoCount: store.redoCount(id) });
     } catch (e) {
       return c.json({ error: (e as Error).message }, 400);
     }
+  });
+
+  // ── 同樂模式（GM 端）：查詢/更新分享設定 ──
+  app.get('/:id/share', (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    return c.json({ token: game.share_token, settings: parseShare(game) });
+  });
+
+  app.post('/:id/share', async (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const patch = (await c.req.json().catch(() => ({}))) as Partial<ShareSettings>;
+    const settings: ShareSettings = { ...DEFAULT_SHARE, ...parseShare(game), ...patch };
+    // token 首次開啟時生成，之後固定（開關不換連結）
+    const token = game.share_token ?? (settings.enabled ? nanoid(12) : null);
+    store.updateShare(game.id, token, JSON.stringify(settings));
+    notify(game.id);
+    return c.json({ token, settings });
   });
 
   return app;

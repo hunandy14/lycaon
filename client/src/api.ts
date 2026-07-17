@@ -1,4 +1,11 @@
-import type { EventEnvelope, GameConfig, GameEvent, GameProgress } from '@lycaon/engine';
+import type { EventEnvelope, GameConfig, GameEvent, GameProgress, ShareSettings, SpectatorView } from '@lycaon/engine';
+
+export interface ShareInfo {
+  token: string | null;
+  settings: ShareSettings;
+}
+
+export type WatchData = SpectatorView & { title: string };
 
 export interface GameSummary {
   id: string;
@@ -65,4 +72,12 @@ export const api = {
 
   redo: (id: string) =>
     req<{ headSeq: number; redoCount: number }>(`/games/${id}/redo`, { method: 'POST', body: '{}' }),
+
+  getShare: (id: string) => req<ShareInfo>(`/games/${id}/share`),
+
+  updateShare: (id: string, patch: Partial<ShareSettings>) =>
+    req<ShareInfo>(`/games/${id}/share`, { method: 'POST', body: JSON.stringify(patch) }),
+
+  getWatch: (token: string, seat?: number | null) =>
+    req<WatchData>(`/watch/${token}${seat ? `?seat=${seat}` : ''}`),
 };

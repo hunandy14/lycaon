@@ -48,6 +48,7 @@ export function resolveSheriffVote(ctx: Ctx, ballots: Ballot[]): void {
     ctx,
     `警長競選投票（${e.pkSeats ? 'PK 輪' : '第一輪'}）：${ballots.map((b) => `${b.voter}→${b.target === null ? '棄' : b.target}`).join('、') || '無人投票'}`,
     false,
+    'ballots',
   );
 
   if (top.length === 1) return concludeElection(ctx, top[0]!);

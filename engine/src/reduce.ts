@@ -231,8 +231,11 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
       const via = (next.actionQueue.shift() as { via: 'hunter' | 'blackWolfKing' | 'whiteWolfExplode' }).via;
       const label = via === 'whiteWolfExplode' ? '白狼王自爆帶走' : `【${roleName(via)}】開槍帶走`;
       if (event.target === null) {
-        pushLog(ctx, `${seatLabel(next, event.shooter)}放棄${via === 'whiteWolfExplode' ? '帶人' : '開槍'}`, false);
+        // 不亮牌就沒人知道有槍：放棄開槍是祕密（公開會反向暴露死者是獵人/狼王）
+        pushLog(ctx, `${seatLabel(next, event.shooter)}放棄${via === 'whiteWolfExplode' ? '帶人' : '開槍'}`, true);
       } else {
+        const shooter = next.players.find((p) => p.seat === event.shooter)!;
+        shooter.skillUsed = true; // 亮牌開槍 = 自曝身分（觀戰端據此亮牌）
         pushLog(ctx, `${seatLabel(next, event.shooter)}${label} ${seatLabel(next, event.target)}`, false);
         applyDeath(ctx, event.target, 'shot', false, 'day');
       }
@@ -277,7 +280,7 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
       break;
 
     case 'NOTE_ADDED':
-      pushLog(ctx, `📝 ${event.text}`, true);
+      pushLog(ctx, `📝 ${event.text}`, true, 'note');
       break;
 
     case 'GAME_ABORTED':

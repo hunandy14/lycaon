@@ -42,6 +42,10 @@ POST /api/games/:id/events     → { event, expectedSeq }；409=seq 衝突、400
 POST /api/games/:id/undo       → { toSeq? }；建局事件不可撤銷；append 會清掉 redo 分支
 POST /api/games/:id/redo
 DELETE /api/games/:id
+GET  /api/games/:id/share      → { token, settings }（GM 端同樂設定）
+POST /api/games/:id/share      → body Partial<ShareSettings>；首次開啟生成 token 後固定
+GET  /api/watch/:token         → 觀戰過濾快照（?seat=N 死者解鎖上帝視角）；未開啟=404
+GET  /api/watch/:token/stream  → SSE（append/undo/redo/設定變更時推 update，25s 心跳）
 ```
 
 ## Client（client/src）
@@ -65,7 +69,13 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - ✅ 首頁進度（`gameProgress` selector + `games.progress_json` 快照）與**終局報表**（`engine/src/report.ts` 的
   `buildGameReport(envelopes)`：增量 replay 擷取中間態——投票當下陣營、當夜結算名單、歷任警長）。
   投票準確度以「投票當下」的 `factionOf` 計（與查驗語義一致）；第三方情侶不計分、邱比特照計。`npm test` 83 綠。
-- ⬜ 玩家端（SSE 廣播 + secret 過濾）仍為未來項目。
+- ✅ **同樂模式**（觀戰端）：GM 於 GamePage「📡 同樂」開關並取得 `/watch/:token` 邀請連結。
+  - **過濾一律在 server 端**（engine/src/watch.ts 的 `buildSpectatorView`，防從網路層扒底牌）；
+    觀戰 token 與 game id 分離，觀戰者拿不到 GM API。
+  - ShareSettings 開關：`showVotes`/`showDeadRoles`/`showTimeline`/`godViewForDead`；翻牌白癡、
+    自爆狼、翻牌騎士屬「自曝身分」永遠公開；終局全攤牌；死者上帝視角=信任制自選座位。
+  - SSE：server/src/live.ts 單進程訂閱中樞（PM2 fork 單實例前提）；client EventSource + 30s 保底輪詢。
+- ⬜ 觀戰頁聊天室（可掛在同一 SSE 中樞 + chat 資料表，見計畫）為未來項目。
 
 ## 執行
 
@@ -79,5 +89,7 @@ pm2 start ecosystem.config.cjs   # 常駐（正式部署用；需先 npm run bui
 ## 部署與網路（重要）
 
 - **server 預設只綁 `127.0.0.1`**（`HOST` env 可改）。這台機器有公網 IP，外部一律走 Cloudflare Tunnel 從同機 localhost 連入，埠不對外開放以免繞過 Zero Trust。改 server 綁定時務必維持這點。
+- **同樂模式對外開放時**：CF Access 的 bypass 只能放行 `/watch/*` 與 `/api/watch/*`（觀戰端已在 server 端過濾）。
+  **`/api/games/*` 絕不可放行**——它無驗證回傳完整事件流（含夜晚行動）且可寫入，放行等於觀戰者拿到 GM 權限。
 - PM2：`ecosystem.config.cjs`（fork 單實例，因 better-sqlite3 單寫入者）。**關鍵**：script 是 `.ts`，PM2 會依副檔名自動選 `bun`，故設定檔已明確指定 `interpreter: 'node'` + `node_args: '--import tsx'`，勿移除。
 - serveStatic 的 root 用 `relative(process.cwd(), clientDist)`：因 `npm start`（cwd=server/）與 PM2（cwd=專案根）的 cwd 不同，這樣兩者都對。

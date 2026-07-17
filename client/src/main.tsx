@@ -8,6 +8,7 @@ import { NewGamePage } from './pages/NewGamePage';
 import { GamePage } from './pages/GamePage';
 import { TimelinePage } from './pages/TimelinePage';
 import { ReportPage } from './pages/ReportPage';
+import { WatchPage } from './pages/WatchPage';
 
 const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
   { path: '/game/:id', element: <GamePage /> },
   { path: '/game/:id/timeline', element: <TimelinePage /> },
   { path: '/game/:id/report', element: <ReportPage /> },
+  { path: '/watch/:token', element: <WatchPage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

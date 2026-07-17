@@ -15,4 +15,5 @@ export { validate, type ValidationResult } from './validate';
 export { reduce, replay, initialState, EngineError } from './reduce';
 export * from './selectors';
 export * from './report';
+export * from './watch';
 export { phaseLabel } from './ctx';

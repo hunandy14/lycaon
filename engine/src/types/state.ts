@@ -95,8 +95,10 @@ export interface TimelineEntry {
   day: number;
   phase: string; // 顯示用：「第 1 夜」「第 2 天」
   text: string;
-  /** true = 僅 GM 可見（未來玩家端過濾用） */
+  /** true = 僅 GM 可見（觀戰端過濾用） */
   secret: boolean;
+  /** 條目類別（觀戰端細粒度過濾）：ballots=票型明細（隨 showVotes）、note=GM 筆記（永不外流） */
+  kind?: 'ballots' | 'note';
 }
 
 export interface GameState {

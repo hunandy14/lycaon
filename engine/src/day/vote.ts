@@ -41,7 +41,7 @@ export function resolveExileVote(ctx: Ctx, ballots: Ballot[]): void {
   const isPk = state.phase.t === 'day' && state.phase.stage === 'pk';
   const { top, counts } = tally(ballots, exileVoteWeight(state));
 
-  pushLog(ctx, `放逐投票（${isPk ? 'PK 輪' : '第一輪'}）：${describeBallots(state, ballots)}`, false);
+  pushLog(ctx, `放逐投票（${isPk ? 'PK 輪' : '第一輪'}）：${describeBallots(state, ballots)}`, false, 'ballots');
 
   if (top.length === 1) {
     const seat = top[0]!;
