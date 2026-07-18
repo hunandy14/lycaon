@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Check, Copy, QrCode as QrIcon } from 'lucide-react';
 import QRCode from 'qrcode';
 import type { ShareSettings } from '@lycaon/engine';
 import { api, type ShareInfo } from '../api';
@@ -59,11 +60,23 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
             <Row label="開啟同樂模式" hint="關閉後連結立即失效；重新開啟連結不變" value={s!.enabled} onChange={(v) => patch({ enabled: v })} />
 
             {url && (
-              <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+              <div className="card" style={{ padding: 12, marginBottom: 8 }}>
                 <div className="row" style={{ alignItems: 'center', gap: 8 }}>
-                  <div className="small faint grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</div>
-                  <button className="btn btn-sm" onClick={copy} aria-label="複製邀請連結">{copied ? '✅' : '📋'}</button>
-                  <button className={`btn btn-sm ${showQr ? 'btn-primary' : ''}`} onClick={() => setShowQr((v) => !v)} aria-label="顯示 QR Code">🔳</button>
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>邀請連結</div>
+                    <div className="faint small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</div>
+                  </div>
+                  <button className="btn btn-sm" onClick={copy} aria-label="複製邀請連結" style={{ display: 'inline-flex', padding: 9 }}>
+                    {copied ? <Check size={17} /> : <Copy size={17} />}
+                  </button>
+                  <button
+                    className={`btn btn-sm ${showQr ? 'btn-primary' : ''}`}
+                    onClick={() => setShowQr((v) => !v)}
+                    aria-label="顯示 QR Code"
+                    style={{ display: 'inline-flex', padding: 9 }}
+                  >
+                    <QrIcon size={17} />
+                  </button>
                 </div>
                 {showQr && qr && (
                   <div className="center" style={{ marginTop: 10 }}>
