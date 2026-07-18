@@ -1,7 +1,17 @@
-import type { EventEnvelope, GameConfig, GameEvent, GameProgress, RoleId, ShareSettings, SpectatorView } from '@lycaon/engine';
+import type {
+  EventEnvelope,
+  GameConfig,
+  GameEvent,
+  GameProgress,
+  GhostView,
+  RoleId,
+  ShareSettings,
+  SpectatorView,
+} from '@lycaon/engine';
 
 export interface ShareInfo {
   token: string | null;
+  ghostToken: string | null;
   settings: ShareSettings;
 }
 
@@ -17,12 +27,19 @@ export interface PlayerStat {
 
 export type WatchData = SpectatorView & { title: string };
 
-/** 觀戰頁聊天訊息（獨立於遊戲事件，不進 reducer/undo） */
+/** 陰間頁資料：canReveal=true 回全知 GhostView（god:true），否則降級為觀眾等級（god:false） */
+export type GhostData = { title: string } & ((GhostView & { god: true }) | (SpectatorView & { god: false }));
+
+export type ChatScope = 'watch' | 'ghost';
+
+/** 聊天訊息（獨立於遊戲事件，不進 reducer/undo）。scope 分房；isGm=GM 監看端發言 */
 export interface ChatMessage {
   id: number;
   gameId: string;
   nick: string;
   text: string;
+  scope: ChatScope;
+  isGm: boolean;
   createdAt: string;
 }
 
@@ -130,10 +147,27 @@ export const api = {
 
   getWatch: (token: string) => req<WatchData>(`/watch/${token}`),
 
-  getChat: (token: string) => req<{ messages: ChatMessage[] }>(`/watch/${token}/chat`).then((r) => r.messages),
+  getGhost: (token: string) => req<GhostData>(`/ghost/${token}`),
 
-  sendChat: (token: string, nick: string, text: string) =>
-    req<ChatMessage>(`/watch/${token}/chat`, { method: 'POST', body: JSON.stringify({ nick, text }) }),
+  /** base='watch' 走 /api/watch（scope 固定 watch，query 省略）；base='ghost' 走 /api/ghost（雙房，帶 scope query） */
+  getChat: (base: 'watch' | 'ghost', token: string, scope: ChatScope = 'watch') =>
+    req<{ messages: ChatMessage[] }>(
+      base === 'watch' ? `/watch/${token}/chat` : `/ghost/${token}/chat?scope=${scope}`,
+    ).then((r) => r.messages),
+
+  sendChat: (base: 'watch' | 'ghost', token: string, nick: string, text: string, scope: ChatScope = 'watch') =>
+    req<ChatMessage>(
+      base === 'watch' ? `/watch/${token}/chat` : `/ghost/${token}/chat`,
+      { method: 'POST', body: JSON.stringify({ nick, text, scope }) },
+    ),
+
+  /** GM 聊天監看：一次回兩房歷史（需房主密碼） */
+  getGmChat: (id: string) =>
+    req<{ watch: ChatMessage[]; ghost: ChatMessage[] }>(`/games/${id}/chat`, undefined, roomPass.get(id)),
+
+  /** GM 發言：nick 固定 'GM'、isGm=1，server 端免 rate limit（需房主密碼） */
+  sendGmChat: (id: string, scope: ChatScope, text: string) =>
+    req<ChatMessage>(`/games/${id}/chat`, { method: 'POST', body: JSON.stringify({ scope, text }) }, roomPass.get(id)),
 
   getRoster: () => req<{ names: string[] }>('/roster').then((r) => r.names),
 

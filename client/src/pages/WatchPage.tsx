@@ -5,14 +5,15 @@ import { api, type WatchData } from '../api';
 import { factionColor, roleShort } from '../ui/roleStyle';
 import { WatchChat } from '../components/WatchChat';
 
-const WIN_STYLE = {
+/** 勝方樣式（GhostPage 全知終局畫面共用） */
+export const WIN_STYLE = {
   good: { emoji: '✋', title: '好人陣營勝利', color: 'var(--good)' },
   wolf: { emoji: '🐺', title: '狼人陣營勝利', color: 'var(--wolf)' },
   lovers: { emoji: '💘', title: '情侶獲勝', color: '#f472b6' },
 } as const;
 
-/** 事件時間 HH:MM（envelope.at 供顯示） */
-const fmtTime = (iso: string): string => {
+/** 事件時間 HH:MM（envelope.at 供顯示）（GhostPage 共用） */
+export const fmtTime = (iso: string): string => {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
@@ -190,7 +191,8 @@ export function WatchPage() {
   );
 }
 
-function WatchVote({ v }: { v: SpectatorVote }) {
+/** 投票明細區塊（GhostPage 全知投票列表共用） */
+export function WatchVote({ v }: { v: SpectatorVote }) {
   const max = Math.max(1, ...v.counts.map((c) => c.votes));
   const top = v.counts[0]?.votes ?? 0;
   const abstains = v.ballots.filter((b) => b.target === null).map((b) => b.voter);

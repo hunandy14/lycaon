@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent, GameState } from '../src';
-import { buildGameReport, buildSpectatorView, DEFAULT_SHARE, replay } from '../src';
+import { buildGameReport, buildGhostView, buildSpectatorView, DEFAULT_SHARE, replay } from '../src';
 import { makeConfig, toEnvelopes, ballots, night, nextNight, run, STANDARD12 } from './helpers';
 
 const SETTINGS = { ...DEFAULT_SHARE, enabled: true };
@@ -208,5 +208,53 @@ describe('buildSpectatorView（統一視角）', () => {
     const v = buildSpectatorView(replay(envelopes), SETTINGS, buildGameReport(envelopes));
     expect(v.phaseText).toContain('第 1 天');
     expect(v.aliveCount).toBe(10);
+  });
+});
+
+const withGhostReport = (state: GameState, events: GameEvent[], settings = SETTINGS) =>
+  buildGhostView(state, settings, buildGameReport(toEnvelopes(makeConfig([...STANDARD12]), events)));
+
+describe('buildGhostView（陰間開眼＝GM 全知視角）', () => {
+  it('god:true、canReveal:true、全部角色都給（不論死活）', () => {
+    const { state, events } = midGame();
+    const v = withGhostReport(state, events);
+    expect(v.god).toBe(true);
+    expect(v.canReveal).toBe(true);
+    expect(v.players.find((p) => p.seat === 5)!.role).toBe('villager');
+    expect(v.players.find((p) => p.seat === 9)!.role).toBe('werewolf');
+    expect(v.players.find((p) => p.seat === 1)!.role).toBeTruthy(); // 活人也給
+  });
+
+  it('全知時間軸含夜晚行動與查驗，只濾 GM 筆記', () => {
+    const { state, events } = midGame();
+    const withNote = run(makeConfig([...STANDARD12]), [...events, { type: 'NOTE_ADDED', text: '懷疑 3 號 7 號串通' }]);
+    const v = buildGhostView(withNote, SETTINGS);
+    expect(v.timeline.some((e) => e.text.includes('查驗'))).toBe(true);
+    expect(v.timeline.some((e) => e.secret)).toBe(true);
+    expect(v.timeline.some((e) => e.text.includes('串通'))).toBe(false); // 筆記永不外流
+    // 序列化含 role
+    expect(JSON.stringify(v)).toContain('werewolf');
+  });
+
+  it('夜晚 stage=night 但盤面照給（不拉夜幕）', () => {
+    const state = run(makeConfig([...STANDARD12]), [{ type: 'NIGHT_STARTED' }]);
+    const v = buildGhostView(state, SETTINGS);
+    expect(v.stage).toBe('night');
+    expect(v.players.length).toBe(12);
+  });
+
+  it('待公佈的夜晚死亡照給（死者本來就看得到 GM 結算）', () => {
+    const state = run(makeConfig([...STANDARD12]), [...night({ wolf: 5, seer: 9 })]); // 尚未 DEATHS_ANNOUNCED
+    const v = buildGhostView(state, SETTINGS);
+    expect(v.pendingDeaths.some((d) => d.seat === 5)).toBe(true);
+    expect(v.seerChecks.some((c) => c.target === 9)).toBe(true);
+  });
+
+  it('跨天投票全給，不受只報今天限制', () => {
+    const { state, events } = twoDayGame();
+    const v = withGhostReport(state, events);
+    expect(v.votes.some((r) => r.day === 1)).toBe(true);
+    expect(v.votes.some((r) => r.day === 2)).toBe(true);
+    expect(v.timeline.some((e) => e.phase.includes('第 1'))).toBe(true);
   });
 });

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb, EventStore } from './db';
 import { gamesRoutes } from './routes/games';
 import { watchRoutes } from './routes/watch';
+import { ghostRoutes } from './routes/ghost';
 import { statsRoutes } from './routes/stats';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ const app = new Hono();
 
 app.route('/api/games', gamesRoutes(store));
 app.route('/api/watch', watchRoutes(store));
+app.route('/api/ghost', ghostRoutes(store));
 app.route('/api', statsRoutes(store));
 app.get('/api/health', (c) => c.json({ ok: true }));
 
