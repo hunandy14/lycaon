@@ -46,8 +46,11 @@ export function watchRoutes(store: EventStore): Hono {
 
     return streamSSE(c, async (stream) => {
       let alive = true;
-      const unsub = subscribe(gameId, () => {
-        void stream.writeSSE({ event: 'update', data: String(Date.now()) });
+      const unsub = subscribe(gameId, (event) => {
+        if (event.kind === 'update') {
+          void stream.writeSSE({ event: 'update', data: String(Date.now()) });
+        }
+        // chat 事件的推播於步驟 3 加入聊天路由後啟用
       });
       stream.onAbort(() => {
         alive = false;
