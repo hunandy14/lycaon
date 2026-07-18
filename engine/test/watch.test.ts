@@ -81,8 +81,12 @@ describe('buildSpectatorView（統一視角）', () => {
     expect(v.votes!.length).toBeGreaterThan(0);
     expect(v.votes!.every((r) => r.day === 2)).toBe(true);
     expect(v.votes!.some((r) => r.day === 1)).toBe(false);
-    // 時間軸只含第 2 天（不含「第 1」）
+    // 時間軸只含第 2 天白天（不含「第 1」、也不含夜晚行——白天板不報「天黑請閉眼」）
     expect(v.timeline!.every((e) => !e.phase.includes('第 1'))).toBe(true);
+    expect(v.timeline!.every((e) => !e.phase.includes('夜'))).toBe(true);
+    expect(v.timeline!.some((e) => e.text.includes('天黑請閉眼'))).toBe(false);
+    // 事件帶時間戳（envelope.at）
+    expect(v.timeline!.every((e) => typeof e.at === 'string' && e.at.length > 0)).toBe(true);
     // 但盤面仍是當前存活狀態：第 1 夜死的 5 號、第 1 天放逐的 9 號都還標死（當前結果）
     expect(v.players.find((p) => p.seat === 5)!.alive).toBe(false);
     expect(v.players.find((p) => p.seat === 9)!.alive).toBe(false);

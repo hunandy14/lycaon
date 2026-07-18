@@ -4,6 +4,11 @@ import { Toast } from '../components/Toast';
 import { UnlockGate } from '../components/UnlockGate';
 import type { TimelineEntry } from '@lycaon/engine';
 
+const fmtTime = (iso: string): string => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 export function TimelinePage() {
   const { id = '' } = useParams();
   const g = useGame(id);
@@ -44,7 +49,7 @@ export function TimelinePage() {
             <div className="tl-day">{grp.label}</div>
             {grp.entries.map((e, i) => (
               <div key={`${e.seq}-${i}`} className="tl-entry">
-                <span className="tl-seq">#{e.seq}</span>
+                <span className="tl-time faint">{fmtTime(e.at)}</span>
                 <span className={`tl-text ${e.secret ? 'tl-secret' : ''}`}>{e.text}</span>
                 {active && e.seq > 1 && (
                   <button className="btn btn-sm btn-ghost faint tl-revert" onClick={() => revertTo(e.seq)} title="回退到此步之前">

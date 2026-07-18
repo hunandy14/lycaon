@@ -10,6 +10,12 @@ const WIN_STYLE = {
   lovers: { emoji: '💘', title: '情侶獲勝', color: '#f472b6' },
 } as const;
 
+/** 事件時間 HH:MM（envelope.at 供顯示） */
+const fmtTime = (iso: string): string => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 /** 統一視角觀戰頁：夜晚拉夜幕、白天只報今天、終局全攤牌；無身份、人人同一份 */
 export function WatchPage() {
   const { token = '' } = useParams();
@@ -168,7 +174,7 @@ export function WatchPage() {
               <div className="wlog">
                 {[...data.timeline].reverse().map((e) => (
                   <div key={e.seq} className="wlog-row">
-                    <span className="wlog-phase">{e.phase}</span>
+                    <span className="wlog-phase">{stage === 'ended' ? e.phase : fmtTime(e.at)}</span>
                     <span className={e.secret ? 'wlog-secret' : ''}>{e.secret ? '🔒 ' : ''}{e.text}</span>
                   </div>
                 ))}

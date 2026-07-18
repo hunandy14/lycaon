@@ -76,8 +76,8 @@ export interface SpectatorView {
   players: SpectatorPlayer[];
   /** 只含「今天」的投票（終局為全部）；showVotes 關 = null */
   votes: SpectatorVote[] | null;
-  /** 只含「今天」的公開事件（終局為全部）；showTimeline 關 = null */
-  timeline: { seq: number; phase: string; text: string; secret: boolean }[] | null;
+  /** 只含「今天白天」的公開事件（終局為全部）；showTimeline 關 = null */
+  timeline: { seq: number; at: string; phase: string; text: string; secret: boolean }[] | null;
   settings: Omit<ShareSettings, 'enabled'>;
 }
 
@@ -162,7 +162,9 @@ export function buildSpectatorView(state: GameState, settings: ShareSettings, re
           .filter((e) => (revealAll ? true : !e.secret))
           .filter((e) => (e.kind === 'ballots' ? settings.showVotes || revealAll : true))
           .filter((e) => showToday(e.day)) // 只報今天
-          .map((e) => ({ seq: e.seq, phase: e.phase, text: e.text, secret: e.secret }))
+          // 白天板不顯示夜晚事件（夜N 與 日N 同一 day，「天黑請閉眼」等屬夜幕、不進白天板）；終局全留
+          .filter((e) => revealAll || !e.phase.includes('夜'))
+          .map((e) => ({ seq: e.seq, at: e.at, phase: e.phase, text: e.text, secret: e.secret }))
       : null;
 
   const progress = gameProgress(state);
