@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { Ghost, MessageCircle } from 'lucide-react';
 import { useGame } from '../hooks/useGame';
 import { PhaseBanner } from '../components/PhaseBanner';
 import { StatusBar } from '../components/StatusBar';
@@ -9,8 +9,11 @@ import { UnlockGate } from '../components/UnlockGate';
 import { Toast } from '../components/Toast';
 import { PhasePanel } from '../panels/PhasePanel';
 import { useWakeLock } from '../hooks/useWakeLock';
+import type { ShareSettings } from '@lycaon/engine';
 import { api } from '../api';
-import { GmChatSheet, chatSeenKey } from '../components/GmChatSheet';
+import { ChatFab } from '../components/ChatFab';
+import { ChatRoom } from '../components/ChatRoom';
+import { useChatUnread } from '../hooks/useChatUnread';
 import { GhostSheet } from '../components/GhostSheet';
 
 export function GamePage() {
@@ -18,37 +21,22 @@ export function GamePage() {
   const g = useGame(id);
   const [shareOpen, setShareOpen] = useState(false);
   const [ghostOpen, setGhostOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatAvailable, setChatAvailable] = useState(false);
-  const [chatUnread, setChatUnread] = useState(false);
+  const [openChat, setOpenChat] = useState<'ghost' | 'watch' | null>(null);
+  const [shareSettings, setShareSettings] = useState<ShareSettings | null>(null);
   useWakeLock(g.state?.phase.t !== 'ended');
 
   useEffect(() => {
     if (g.state?.config.title) document.title = `${g.state.config.title} · 狼人殺 GM`;
   }, [g.state?.config.title]);
 
-  // 陽間或陰間聊天室啟用時才顯示監看入口；順便用兩房最新訊息時間判斷未讀紅點
+  // 陽間或陰間聊天球是否顯示，取決於同樂設定（showChat/ghostEnabled）；輪詢跟原本一致（15 秒）
   useEffect(() => {
     if (!g.state) return;
     let cancelled = false;
     const poll = async () => {
       try {
         const info = await api.getShare(id);
-        const available = info.settings.showChat || info.settings.ghostEnabled;
-        if (cancelled) return;
-        setChatAvailable(available);
-        if (!available) {
-          setChatUnread(false);
-          return;
-        }
-        const chat = await api.getGmChat(id);
-        if (cancelled) return;
-        const latest = [...chat.watch, ...chat.ghost].reduce<string | null>(
-          (acc, m) => (!acc || m.createdAt > acc ? m.createdAt : acc),
-          null,
-        );
-        const seen = localStorage.getItem(chatSeenKey(id));
-        setChatUnread(!!latest && (!seen || latest > seen));
+        if (!cancelled) setShareSettings(info.settings);
       } catch {
         // 靜默失敗：聊天監看是輔助功能，不擋主流程
       }
@@ -60,6 +48,11 @@ export function GamePage() {
       clearInterval(iv);
     };
   }, [id, g.state]);
+
+  const ghostChatAvailable = !!shareSettings?.ghostEnabled;
+  const watchChatAvailable = !!shareSettings?.showChat;
+  const ghostUnread = useChatUnread({ gm: true, gameId: id, scope: 'ghost' }, openChat === 'ghost', ghostChatAvailable);
+  const watchUnread = useChatUnread({ gm: true, gameId: id, scope: 'watch' }, openChat === 'watch', watchChatAvailable);
 
   if (g.loading) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>載入對局中…</p></div>;
   if (g.needPassword) return <UnlockGate busy={g.busy} error={g.error} onUnlock={g.unlock} />;
@@ -92,40 +85,40 @@ export function GamePage() {
       <div className="row" style={{ marginTop: 20, justifyContent: 'center', gap: 16 }}>
         <button className="btn btn-ghost btn-sm faint" onClick={() => setShareOpen(true)}>📡 同樂</button>
         <button className="btn btn-ghost btn-sm faint" onClick={() => setGhostOpen(true)}>👻 陰間</button>
-        {chatAvailable && (
-          <button
-            className="btn btn-ghost btn-sm faint"
-            onClick={() => {
-              setChatUnread(false);
-              setChatOpen(true);
-            }}
-            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-          >
-            <MessageCircle size={15} /> 聊天
-            {chatUnread && (
-              <span
-                aria-label="有新訊息"
-                style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -2,
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: 'var(--danger)',
-                }}
-              />
-            )}
-          </button>
-        )}
         <Link to={`/game/${id}/timeline`} className="btn btn-ghost btn-sm faint">📜 時間軸</Link>
         <Link to="/" className="btn btn-ghost btn-sm faint">🏠 首頁</Link>
       </div>
 
       {shareOpen && <ShareSheet id={id} onClose={() => setShareOpen(false)} />}
       {ghostOpen && <GhostSheet id={id} onClose={() => setGhostOpen(false)} />}
-      {chatOpen && <GmChatSheet id={id} onClose={() => setChatOpen(false)} />}
       <Toast message={g.error} onClose={g.clearError} />
+
+      {ghostChatAvailable && (
+        <ChatFab
+          icon={Ghost}
+          label="陰間聊天室（GM）"
+          accent="#a78bfa"
+          unread={ghostUnread}
+          open={openChat === 'ghost'}
+          onToggle={() => setOpenChat((v) => (v === 'ghost' ? null : 'ghost'))}
+          slot={0}
+        >
+          <ChatRoom gm gameId={id} scope="ghost" />
+        </ChatFab>
+      )}
+      {watchChatAvailable && (
+        <ChatFab
+          icon={MessageCircle}
+          label="陽間聊天室（GM）"
+          accent="var(--accent)"
+          unread={watchUnread}
+          open={openChat === 'watch'}
+          onToggle={() => setOpenChat((v) => (v === 'watch' ? null : 'watch'))}
+          slot={ghostChatAvailable ? 1 : 0}
+        >
+          <ChatRoom gm gameId={id} scope="watch" />
+        </ChatFab>
+      )}
     </div>
   );
 }

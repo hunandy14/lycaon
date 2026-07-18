@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Ghost, MessageCircle } from 'lucide-react';
 import { api, type GhostData } from '../api';
 import { factionColor, roleShort } from '../ui/roleStyle';
-import { WatchChat } from '../components/WatchChat';
+import { ChatFab } from '../components/ChatFab';
+import { ChatRoom, NickChip } from '../components/ChatRoom';
+import { useChatUnread } from '../hooks/useChatUnread';
 import { WIN_STYLE, fmtTime, WatchVote } from './WatchPage';
 
 const eyeKey = (token: string) => `lycaon:ghosteye:${token}`;
@@ -26,6 +29,10 @@ export function GhostPage() {
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
   const [eye, setEye] = useState(() => localStorage.getItem(eyeKey(token)) === '1');
+  const [openChat, setOpenChat] = useState<'ghost' | 'watch' | null>(null);
+  const watchChatEnabled = !!data?.settings.showChat && !error;
+  const ghostUnread = useChatUnread({ base: 'ghost', token, scope: 'ghost' }, openChat === 'ghost', !error);
+  const watchUnread = useChatUnread({ base: 'ghost', token, scope: 'watch' }, openChat === 'watch', watchChatEnabled);
 
   const load = useCallback(async () => {
     try {
@@ -241,9 +248,31 @@ export function GhostPage() {
         </>
       )}
 
-      <WatchChat token={token} base="ghost" scope="ghost" live={live} disabled={!!error} title="👻 陰間聊天室" />
+      <ChatFab
+        icon={Ghost}
+        label="陰間聊天室"
+        accent="#a78bfa"
+        unread={ghostUnread}
+        open={openChat === 'ghost'}
+        onToggle={() => setOpenChat((v) => (v === 'ghost' ? null : 'ghost'))}
+        slot={0}
+        headerExtra={<NickChip />}
+      >
+        <ChatRoom token={token} base="ghost" scope="ghost" live={live} disabled={!!error} />
+      </ChatFab>
       {data.settings.showChat && (
-        <WatchChat token={token} base="ghost" scope="watch" live={live} disabled={!!error} title="☀️ 陽間聊天室" />
+        <ChatFab
+          icon={MessageCircle}
+          label="陽間聊天室"
+          accent="var(--accent)"
+          unread={watchUnread}
+          open={openChat === 'watch'}
+          onToggle={() => setOpenChat((v) => (v === 'watch' ? null : 'watch'))}
+          slot={1}
+          headerExtra={<NickChip />}
+        >
+          <ChatRoom token={token} base="ghost" scope="watch" live={live} disabled={!!error} />
+        </ChatFab>
       )}
     </div>
   );

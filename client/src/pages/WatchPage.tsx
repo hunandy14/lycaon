@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 import type { SpectatorVote } from '@lycaon/engine';
 import { api, type WatchData } from '../api';
 import { factionColor, roleShort } from '../ui/roleStyle';
-import { WatchChat } from '../components/WatchChat';
+import { ChatFab } from '../components/ChatFab';
+import { ChatRoom, NickChip } from '../components/ChatRoom';
+import { useChatUnread } from '../hooks/useChatUnread';
 
 /** 勝方樣式（GhostPage 全知終局畫面共用） */
 export const WIN_STYLE = {
@@ -24,6 +27,9 @@ export function WatchPage() {
   const [data, setData] = useState<WatchData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatEnabled = !!data?.settings.showChat && !error;
+  const unread = useChatUnread({ base: 'watch', token, scope: 'watch' }, chatOpen, chatEnabled);
 
   const load = useCallback(async () => {
     try {
@@ -186,7 +192,20 @@ export function WatchPage() {
         </>
       )}
 
-      {data.settings.showChat && <WatchChat token={token} live={live} disabled={!!error} />}
+      {data.settings.showChat && (
+        <ChatFab
+          icon={MessageCircle}
+          label="聊天室"
+          accent="var(--accent)"
+          unread={unread}
+          open={chatOpen}
+          onToggle={() => setChatOpen((v) => !v)}
+          slot={0}
+          headerExtra={<NickChip />}
+        >
+          <ChatRoom token={token} live={live} disabled={!!error} />
+        </ChatFab>
+      )}
     </div>
   );
 }
