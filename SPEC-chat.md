@@ -30,7 +30,7 @@
 
 ## 步驟（依序執行第一個未勾選的，一輪只做一步）
 
-- [ ] 1. **資料表 + store 層**：db.ts 建 `chat` 表；EventStore 加 `appendChat(gameId, nick, text, now): ChatMessage`
+- [x] 1. **資料表 + store 層**：db.ts 建 `chat` 表；EventStore 加 `appendChat(gameId, nick, text, now): ChatMessage`
       與 `listChat(gameId, limit=50): ChatMessage[]`（ChatMessage 介面定義在 db.ts 並 export）。
 - [ ] 2. **live.ts 擴充**：listener payload 改為上述 union；更新所有既有 notify 呼叫點
       （routes/games.ts 等）為 `{kind:'update'}`；watch stream 的 subscribe 對應轉發（update 照舊、chat 先忽略）。
