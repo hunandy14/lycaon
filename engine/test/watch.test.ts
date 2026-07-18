@@ -92,6 +92,19 @@ describe('buildSpectatorView（統一視角）', () => {
     expect(v.players.find((p) => p.seat === 9)!.alive).toBe(false);
   });
 
+  it('showAllDays 開＝投票與時間軸含之前每一天；夜晚行仍不進白天板', () => {
+    const { state, events } = twoDayGame();
+    const v = withReport(state, events, { ...SETTINGS, showAllDays: true });
+    expect(v.day).toBe(2);
+    // 投票含第 1、2 天
+    expect(v.votes!.some((r) => r.day === 1)).toBe(true);
+    expect(v.votes!.some((r) => r.day === 2)).toBe(true);
+    // 時間軸含第 1 天白天，但夜晚行照舊不下發
+    expect(v.timeline!.some((e) => e.phase.includes('第 1'))).toBe(true);
+    expect(v.timeline!.every((e) => !e.phase.includes('夜'))).toBe(true);
+    expect(v.timeline!.every((e) => !e.secret)).toBe(true);
+  });
+
   it('待公佈的夜晚死亡不得提前顯示', () => {
     const state = run(makeConfig([...STANDARD12]), [...night({ wolf: 5, seer: 9 })]); // 尚未 DEATHS_ANNOUNCED（此時已回白天）
     const v = buildSpectatorView(state, SETTINGS);

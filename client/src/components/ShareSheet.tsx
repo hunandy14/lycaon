@@ -107,11 +107,9 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
 
             {s!.enabled && (
               <>
-                <p className="faint small" style={{ margin: '2px 0 8px' }}>
-                  🌙 夜晚拉夜幕、白天只報今天的戰況（前一天的自己記）；人人同一份、無身份。
-                </p>
                 <Row label="投票明細" hint="每輪票型與棄票（桌上舉手本來就公開；關閉後票型不顯示）" value={s!.showVotes} onChange={(v) => patch({ showVotes: v })} />
                 <Row label="公開時間軸" hint="GM 口播等級的事件流（夜晚行動、死因、查驗一律不含）" value={s!.showTimeline} onChange={(v) => patch({ showTimeline: v })} />
+                <Row label="報所有天數的戰況" hint="投票與時間軸含之前每一天；關閉時只報今天（前一天的自己記）。夜晚一律拉夜幕" value={s!.showAllDays} onChange={(v) => patch({ showAllDays: v })} />
                 <Row label="陽間聊天室" hint="觀戰頁的公開聊天區（人人可見可發言）；關閉後不顯示也不能發言" value={s!.showChat} onChange={(v) => patch({ showChat: v })} />
                 <Row label="死亡時間與死因" hint="死者格顯示哪一天死、白天死因（夜間死因一律不含；終局一律顯示）" value={s!.showDeathInfo} onChange={(v) => patch({ showDeathInfo: v })} />
               </>

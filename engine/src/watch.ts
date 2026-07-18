@@ -29,6 +29,8 @@ export interface ShareSettings {
   showChat: boolean;
   /** 盤面死者格顯示死亡時間與死因（預設關；終局一律顯示） */
   showDeathInfo: boolean;
+  /** 報所有天數的戰況（預設關＝只報今天；夜晚仍拉夜幕、夜晚祕密照舊不下發） */
+  showAllDays: boolean;
 }
 
 export const DEFAULT_SHARE: ShareSettings = {
@@ -38,6 +40,7 @@ export const DEFAULT_SHARE: ShareSettings = {
   showTimeline: true,
   showChat: false,
   showDeathInfo: false,
+  showAllDays: false,
 };
 
 /** 觀戰畫面階段：準備 / 夜幕 / 今日戰況 / 終局 */
@@ -119,7 +122,7 @@ export function buildSpectatorView(state: GameState, settings: ShareSettings, re
         : 'day';
   const revealAll = ended;
   const today = state.day;
-  const showToday = (d: number): boolean => revealAll || d === today; // 只報今天；終局全公開
+  const showToday = (d: number): boolean => revealAll || settings.showAllDays || d === today; // 只報今天；showAllDays/終局全公開
 
   const players: SpectatorPlayer[] = state.players.map((p) => {
     // 自曝身分：翻牌白癡、自爆狼、翻牌騎士、亮牌開槍的獵人/黑狼王（線下都是當眾翻牌）
@@ -197,6 +200,7 @@ export function buildSpectatorView(state: GameState, settings: ShareSettings, re
       showTimeline: settings.showTimeline,
       showChat: settings.showChat,
       showDeathInfo: settings.showDeathInfo,
+      showAllDays: settings.showAllDays,
     },
   };
 }
