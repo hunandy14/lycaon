@@ -84,6 +84,13 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - `hooks/useGame.ts`：載入事件 → 本地 `replay` → `dispatch` 樂觀更新（本地先 `validate`，成功才 POST，失敗回滾；409 自動重載）。undo/redo 走 server 後 refetch。
 - `panels/PhasePanel.tsx`：依 `state.phase` 與 `actionQueue` 路由到對應面板（**佇列非空時優先 ResolvePanel**，對齊引擎 validate）。面板：`SetupPanel` / `NightWizard`（含 WitchStep、NightComplete 顯示查驗結果）/ `DawnPanel` / `SheriffPanel` / `VotePanel`（+ `InterruptBar` 騎士/自爆）/ `ResolvePanel`（遺言/開槍/警徽 FIFO）/ `DayEndPanel` / `GameOverPanel`。
 - `components/`：`SeatGrid`（全 app 目標選擇器，接 `eligibleTargets` 灰化）、`VoteRecorder`（逐票記錄，草稿存 localStorage）、`PickSheet`（底部彈出單選：開槍/決鬥/自爆/警徽）、`PhaseBanner`/`StatusBar`/`SpeechTimer`/`Toast`。
+- **聊天室浮動球**：`ChatFab.tsx`（共用殼：右下角圓球 + 未讀徽章，點開滑出面板——手機貼底整寬、寬螢幕
+  ≥480px 右下浮窗；多球同頁用 `slot` 決定堆疊、同頁同時只開一面板）+ `ChatRoom.tsx`（共用內容層：訊息列表/
+  輸入列/SSE 或輪詢/暱稱 localStorage/黏底捲動/GM 徽章，`gm=true` 走 `api.getGmChat`/`sendGmChat`）。
+  各頁配置：`WatchPage` 1 球（陽間）、`GhostPage` 2 球（陰間 `Ghost` 永遠有＋陽間 `showChat` 時才有）、
+  `GamePage` GM 雙球（陰間 `ghostEnabled`＋陽間 `showChat`，走 gm 模式，取代舊的 💬 按鈕/`GmChatSheet`）。
+  未讀數以 `localStorage(lycaon:seen:<key>)` 記最後已讀訊息 id 計算。舊的 `WatchChat.tsx` 內嵌版與
+  `GmChatSheet.tsx` 已移除。
 - 用到的引擎 selectors：`buildNightPlan`/`currentNightStep`、`eligibleTargets`、`dashboardStats`、`buildDawnAnnouncement`、`exileVoters`/`electionVoters`、`activeCandidates`、`tally`。
 - 樣式：`styles.css` + `components/components.css`，暗色夜晚主題，CSS 變數在 `:root`。`useWakeLock` 主持中防螢幕休眠。
 
