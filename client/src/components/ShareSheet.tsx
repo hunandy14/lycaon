@@ -78,12 +78,30 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
                     <QrIcon size={17} />
                   </button>
                 </div>
-                {showQr && qr && (
-                  <div className="center" style={{ marginTop: 10 }}>
-                    <img src={qr} alt="觀戰連結 QR Code" style={{ width: 220, height: 220, borderRadius: 10, background: '#fff', padding: 8 }} />
-                    <div className="faint small" style={{ marginTop: 6 }}>掃碼直接進觀戰頁</div>
-                  </div>
-                )}
+              </div>
+            )}
+
+            {showQr && qr && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowQr(false);
+                }}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 60,
+                  background: 'rgba(0,0,0,0.65)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div className="panel center" style={{ padding: 18 }} onClick={(e) => e.stopPropagation()}>
+                  <img src={qr} alt="觀戰連結 QR Code" style={{ width: 'min(64vw, 280px)', height: 'auto', borderRadius: 12, background: '#fff', padding: 10 }} />
+                  <div className="faint small" style={{ marginTop: 8 }}>掃碼直接進觀戰頁</div>
+                  <button className="btn btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setShowQr(false)}>關閉</button>
+                </div>
               </div>
             )}
 
