@@ -71,6 +71,7 @@ export function gamesRoutes(store: EventStore): Hono {
     const passwordHash = pw ? hashPassword(pw) : null;
     store.createGame(id, title, JSON.stringify(config), now, passwordHash);
     store.append(id, { type: 'GAME_CREATED', config }, now);
+    store.upsertRoster(config.seats.map((s) => s.name ?? '').filter(Boolean), now);
     syncStatus(store, id);
     return c.json({ id }, 201);
   });
