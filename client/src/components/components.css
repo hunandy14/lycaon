@@ -997,3 +997,12 @@
   border-radius: 4px;
   transition: width 0.3s;
 }
+
+/* ---------- 觀戰夜幕 ---------- */
+.night-curtain {
+  text-align: center;
+  padding: 48px 20px;
+  margin-top: 12px;
+  background: linear-gradient(180deg, #0b0d15, var(--bg-card));
+  border-color: #2a2f45;
+}

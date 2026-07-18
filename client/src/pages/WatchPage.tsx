@@ -10,31 +10,27 @@ const WIN_STYLE = {
   lovers: { emoji: '💘', title: '情侶獲勝', color: '#f472b6' },
 } as const;
 
+/** 統一視角觀戰頁：夜晚拉夜幕、白天只報今天、終局全攤牌；無身份、人人同一份 */
 export function WatchPage() {
   const { token = '' } = useParams();
-  const seatKey = `lycaon:watch:${token}:seat`;
-  const [seat, setSeat] = useState<number | null>(() => {
-    const v = localStorage.getItem(seatKey);
-    return v ? Number(v) : null;
-  });
   const [data, setData] = useState<WatchData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setData(await api.getWatch(token, seat));
+      setData(await api.getWatch(token));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [token, seat]);
+  }, [token]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // SSE 即時推播 + 30s 保底輪詢 + 回到前景時刷新
+  // SSE 即時推播（夜間祕密行動 server 不推）+ 30s 保底輪詢 + 回前景刷新
   useEffect(() => {
     const es = new EventSource(`/api/watch/${token}/stream`);
     const refresh = () => void load();
@@ -57,12 +53,6 @@ export function WatchPage() {
     if (data?.title) document.title = `${data.title} · 觀戰`;
   }, [data?.title]);
 
-  const pickSeat = (v: number | null) => {
-    setSeat(v);
-    if (v === null) localStorage.removeItem(seatKey);
-    else localStorage.setItem(seatKey, String(v));
-  };
-
   if (!data) {
     return (
       <div className="app">
@@ -72,7 +62,10 @@ export function WatchPage() {
     );
   }
 
+  const { stage } = data;
+  const board = stage === 'day' || stage === 'ended';
   const ws = data.winner ? WIN_STYLE[data.winner.faction] : null;
+  const phaseIcon = stage === 'night' ? '🌙 ' : stage === 'day' ? '☀️ ' : '';
 
   return (
     <div className="app">
@@ -81,16 +74,33 @@ export function WatchPage() {
           <div className="grow" style={{ fontWeight: 800, fontSize: '1.05rem' }}>🐺 {data.title}</div>
           <span className={`live-dot ${live ? 'on' : ''}`}>{live ? '● 直播中' : '○ 連線中'}</span>
         </div>
-        <div className={`banner-phase ${data.isNight ? 'banner-night' : 'banner-day'}`} style={{ marginTop: 2 }}>
-          {data.isNight ? '🌙 ' : data.ended ? '' : '☀️ '}
-          {data.phaseText}
+        <div className={`banner-phase ${stage === 'night' ? 'banner-night' : 'banner-day'}`} style={{ marginTop: 2 }}>
+          {phaseIcon}{data.phaseText}
         </div>
-        <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-          <span className="kpi">存活 {data.aliveCount}/{data.total}</span>
-          {data.sheriff !== null && <span className="kpi">★ 警長 {data.sheriff} 號</span>}
-          {data.god && <span className="kpi" style={{ borderColor: '#a78bfa', color: '#c4b5fd' }}>👁 上帝視角</span>}
-        </div>
+        {board && (
+          <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+            <span className="kpi">存活 {data.aliveCount}/{data.total}</span>
+            {data.sheriff !== null && <span className="kpi">★ 警長 {data.sheriff} 號</span>}
+          </div>
+        )}
       </header>
+
+      {stage === 'setup' && (
+        <div className="panel night-curtain">
+          <div style={{ fontSize: '2.6rem' }}>🌑</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>準備開局</div>
+          <p className="faint small" style={{ marginTop: 6 }}>天黑後開始直播今天的戰況</p>
+        </div>
+      )}
+
+      {stage === 'night' && (
+        <div className="panel night-curtain">
+          <div style={{ fontSize: '3rem' }}>🌙</div>
+          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#a5b4fc' }}>第 {data.day} 夜</div>
+          <p className="muted" style={{ marginTop: 6 }}>天黑請閉眼…</p>
+          <p className="faint small" style={{ marginTop: 2 }}>天亮後回來看今天的戰況</p>
+        </div>
+      )}
 
       {ws && (
         <div
@@ -103,85 +113,70 @@ export function WatchPage() {
         </div>
       )}
 
-      {data.election && (
-        <div className="panel" style={{ marginTop: 10, padding: 12 }}>
-          <span className="small">
-            🎖 警長競選中　上警：{data.election.candidates.map((s) => `${s} 號`).join('、') || '（記錄中）'}
-            {data.election.withdrawn.length > 0 && ` · 退水：${data.election.withdrawn.map((s) => `${s} 號`).join('、')}`}
-          </span>
-        </div>
-      )}
-
-      <section className="panel" style={{ marginTop: 10 }}>
-        <div className="panel-title" style={{ fontSize: '0.95rem' }}>玩家</div>
-        <div className="wgrid">
-          {data.players.map((p) => (
-            <div key={p.seat} className={`wseat ${!p.alive ? 'wseat-dead' : ''} ${p.seat === seat ? 'wseat-me' : ''}`}>
-              <div className="wseat-top">
-                <span className="seat-num">{p.seat}</span>
-                {p.isSheriff && <span style={{ color: 'var(--sheriff)' }}>★</span>}
-                {p.lover && <span style={{ fontSize: '0.7rem' }}>💘</span>}
-              </div>
-              {p.role ? (
-                <div className="wseat-role" style={{ color: p.converted ? 'var(--wolf)' : factionColor(p.role) }}>
-                  {roleShort(p.role)}
-                  {p.converted && '🦠'}
-                </div>
-              ) : (
-                <div className="wseat-role wseat-unknown">？</div>
-              )}
-              {p.name && <div className="seat-name">{p.name}</div>}
-              {p.idiotRevealed && <span className="chip chip-idiot">翻牌</span>}
-              {!p.alive && (
-                <div className="wseat-death">
-                  ✕ {p.deathAt}
-                  {p.deathCause ? `・${p.deathCause}` : ''}
-                </div>
-              )}
+      {board && (
+        <>
+          {data.election && (
+            <div className="panel" style={{ marginTop: 10, padding: 12 }}>
+              <span className="small">
+                🎖 警長競選中　上警：{data.election.candidates.map((s) => `${s} 號`).join('、') || '（記錄中）'}
+                {data.election.withdrawn.length > 0 && ` · 退水：${data.election.withdrawn.map((s) => `${s} 號`).join('、')}`}
+              </span>
             </div>
-          ))}
-        </div>
-      </section>
+          )}
 
-      {data.votes && data.votes.length > 0 && (
-        <section className="panel" style={{ marginTop: 10 }}>
-          <div className="panel-title" style={{ fontSize: '0.95rem' }}>投票記錄</div>
-          {[...data.votes].reverse().map((v, i) => <WatchVote key={i} v={v} />)}
-        </section>
-      )}
+          <section className="panel" style={{ marginTop: 10 }}>
+            <div className="panel-title" style={{ fontSize: '0.95rem' }}>玩家</div>
+            <div className="wgrid">
+              {data.players.map((p) => (
+                <div key={p.seat} className={`wseat ${!p.alive ? 'wseat-dead' : ''}`}>
+                  <div className="wseat-top">
+                    <span className="seat-num">{p.seat}</span>
+                    {p.isSheriff && <span style={{ color: 'var(--sheriff)' }}>★</span>}
+                    {p.lover && <span style={{ fontSize: '0.7rem' }}>💘</span>}
+                  </div>
+                  {p.role ? (
+                    <div className="wseat-role" style={{ color: p.converted ? 'var(--wolf)' : factionColor(p.role) }}>
+                      {roleShort(p.role)}
+                      {p.converted && '🦠'}
+                    </div>
+                  ) : (
+                    <div className="wseat-role wseat-unknown">？</div>
+                  )}
+                  {p.name && <div className="seat-name">{p.name}</div>}
+                  {p.idiotRevealed && <span className="chip chip-idiot">翻牌</span>}
+                  {!p.alive && (
+                    <div className="wseat-death">
+                      ✕ {p.deathAt}
+                      {p.deathCause ? `・${p.deathCause}` : ''}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
 
-      {data.timeline && data.timeline.length > 0 && (
-        <section className="panel" style={{ marginTop: 10 }}>
-          <div className="panel-title" style={{ fontSize: '0.95rem' }}>事件流（新 → 舊）</div>
-          <div className="wlog">
-            {[...data.timeline].reverse().map((e) => (
-              <div key={e.seq} className="wlog-row">
-                <span className="wlog-phase">{e.phase}</span>
-                <span className={e.secret ? 'wlog-secret' : ''}>{e.secret ? '🔒 ' : ''}{e.text}</span>
+          {data.votes && data.votes.length > 0 && (
+            <section className="panel" style={{ marginTop: 10 }}>
+              <div className="panel-title" style={{ fontSize: '0.95rem' }}>{stage === 'ended' ? '投票記錄' : '今日投票'}</div>
+              {[...data.votes].reverse().map((v, i) => <WatchVote key={i} v={v} />)}
+            </section>
+          )}
+
+          {data.timeline && data.timeline.length > 0 && (
+            <section className="panel" style={{ marginTop: 10, marginBottom: 30 }}>
+              <div className="panel-title" style={{ fontSize: '0.95rem' }}>{stage === 'ended' ? '事件回顧' : '今日戰況'}（新 → 舊）</div>
+              <div className="wlog">
+                {[...data.timeline].reverse().map((e) => (
+                  <div key={e.seq} className="wlog-row">
+                    <span className="wlog-phase">{e.phase}</span>
+                    <span className={e.secret ? 'wlog-secret' : ''}>{e.secret ? '🔒 ' : ''}{e.text}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          )}
+        </>
       )}
-
-      <section className="panel" style={{ marginTop: 10, marginBottom: 30, padding: 12 }}>
-        <div className="row" style={{ alignItems: 'center', gap: 8 }}>
-          <span className="small">我是玩家：</span>
-          <select
-            className="wselect"
-            value={seat ?? ''}
-            onChange={(e) => pickSeat(e.target.value === '' ? null : Number(e.target.value))}
-          >
-            <option value="">只是觀眾</option>
-            {data.players.map((p) => (
-              <option key={p.seat} value={p.seat}>{p.seat} 號{p.name ? `（${p.name}）` : ''}</option>
-            ))}
-          </select>
-        </div>
-        <p className="faint small" style={{ marginTop: 6 }}>
-          {data.settings.godViewForDead ? '出局後自動解鎖上帝視角（看得到全部身分與夜晚行動）。' : '房主未開放死者上帝視角。'}
-        </p>
-      </section>
     </div>
   );
 }

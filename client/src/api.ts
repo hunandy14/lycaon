@@ -119,8 +119,7 @@ export const api = {
   updateShare: (id: string, patch: Partial<ShareSettings>) =>
     req<ShareInfo>(`/games/${id}/share`, { method: 'POST', body: JSON.stringify(patch) }, roomPass.get(id)),
 
-  getWatch: (token: string, seat?: number | null) =>
-    req<WatchData>(`/watch/${token}${seat ? `?seat=${seat}` : ''}`),
+  getWatch: (token: string) => req<WatchData>(`/watch/${token}`),
 
   getRoster: () => req<{ names: string[] }>('/roster').then((r) => r.names),
 
