@@ -67,9 +67,21 @@ async function req<T>(path: string, init?: RequestInit, pw?: string | null): Pro
       ...init?.headers,
     },
   });
-  const body = await res.json().catch(() => ({}));
+  const text = await res.text();
+  let body: Record<string, unknown> = {};
+  try {
+    body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    // 非 JSON 回應（多半是 SPA fallback 的 index.html）：代理埠不對或連到沒有此 API 的舊版服務
+    throw new ApiError(`伺服器回應非 JSON（${res.status}），可能代理埠不對或服務為舊版`, res.status);
+  }
   if (!res.ok) {
-    throw new ApiError(body.error ?? `請求失敗（${res.status}）`, res.status, body.headSeq, body.needPassword);
+    throw new ApiError(
+      (body.error as string) ?? `請求失敗（${res.status}）`,
+      res.status,
+      body.headSeq as number | undefined,
+      body.needPassword as boolean | undefined,
+    );
   }
   return body as T;
 }
