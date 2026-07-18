@@ -1005,6 +1005,54 @@
   transition: width 0.3s;
 }
 
+/* ---------- 觀戰頁聊天室 ---------- */
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.chat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+.chat-nick {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+.chat-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+  color: var(--text);
+}
+.chat-time {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  color: var(--text-faint);
+}
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.chat-nick-input {
+  flex: 0 0 84px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+.chat-text-input {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
 /* ---------- 觀戰夜幕 ---------- */
 .night-curtain {
   text-align: center;

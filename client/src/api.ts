@@ -17,6 +17,15 @@ export interface PlayerStat {
 
 export type WatchData = SpectatorView & { title: string };
 
+/** 觀戰頁聊天訊息（獨立於遊戲事件，不進 reducer/undo） */
+export interface ChatMessage {
+  id: number;
+  gameId: string;
+  nick: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface GameSummary {
   id: string;
   title: string;
@@ -120,6 +129,11 @@ export const api = {
     req<ShareInfo>(`/games/${id}/share`, { method: 'POST', body: JSON.stringify(patch) }, roomPass.get(id)),
 
   getWatch: (token: string) => req<WatchData>(`/watch/${token}`),
+
+  getChat: (token: string) => req<{ messages: ChatMessage[] }>(`/watch/${token}/chat`).then((r) => r.messages),
+
+  sendChat: (token: string, nick: string, text: string) =>
+    req<ChatMessage>(`/watch/${token}/chat`, { method: 'POST', body: JSON.stringify({ nick, text }) }),
 
   getRoster: () => req<{ names: string[] }>('/roster').then((r) => r.names),
 

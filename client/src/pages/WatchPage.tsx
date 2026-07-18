@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import type { SpectatorVote } from '@lycaon/engine';
 import { api, type WatchData } from '../api';
 import { factionColor, roleShort } from '../ui/roleStyle';
+import { WatchChat } from '../components/WatchChat';
 
 const WIN_STYLE = {
   good: { emoji: '✋', title: '好人陣營勝利', color: 'var(--good)' },
@@ -183,6 +184,8 @@ export function WatchPage() {
           )}
         </>
       )}
+
+      <WatchChat token={token} live={live} />
     </div>
   );
 }
