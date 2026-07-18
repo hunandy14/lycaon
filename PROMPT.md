@@ -9,3 +9,5 @@
 4. 若所有步驟都已勾選且工作樹乾淨，只輸出 `RALPH_DONE` 然後結束。
 
 規則：不問問題、不等待輸入；不動 `/srv/www/lycaon`（主 repo）；不執行 pm2 或任何部署指令；不 push。
+**絕對禁止**：不啟動任何 server / dev server（驗證一律靠測試與 tsc，不靠手動跑起來）；
+不 kill 任何行程、不對 5177 埠做任何事（production 正在上面跑）；不執行 rm -rf、不刪 SPEC 之外的檔案。
