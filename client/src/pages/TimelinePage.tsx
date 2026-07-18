@@ -1,7 +1,13 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../hooks/useGame';
 import { Toast } from '../components/Toast';
+import { UnlockGate } from '../components/UnlockGate';
 import type { TimelineEntry } from '@lycaon/engine';
+
+const fmtTime = (iso: string): string => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 
 export function TimelinePage() {
   const { id = '' } = useParams();
@@ -9,6 +15,7 @@ export function TimelinePage() {
   const nav = useNavigate();
 
   if (g.loading) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>載入中…</p></div>;
+  if (g.needPassword) return <UnlockGate busy={g.busy} error={g.error} onUnlock={g.unlock} />;
   if (!g.state) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>找不到對局</p></div>;
 
   const log = g.state.log;
@@ -42,7 +49,7 @@ export function TimelinePage() {
             <div className="tl-day">{grp.label}</div>
             {grp.entries.map((e, i) => (
               <div key={`${e.seq}-${i}`} className="tl-entry">
-                <span className="tl-seq">#{e.seq}</span>
+                <span className="tl-time faint">{fmtTime(e.at)}</span>
                 <span className={`tl-text ${e.secret ? 'tl-secret' : ''}`}>{e.text}</span>
                 {active && e.seq > 1 && (
                   <button className="btn btn-sm btn-ghost faint tl-revert" onClick={() => revertTo(e.seq)} title="回退到此步之前">

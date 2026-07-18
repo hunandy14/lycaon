@@ -14,6 +14,8 @@ export interface GameRow {
   share_token: string | null;
   /** ShareSettings JSON（null = 從未開過同樂模式） */
   share_json: string | null;
+  /** 房主管理密碼雜湊（scrypt，格式 salt:hex；null = 舊局或不設密碼，不上鎖） */
+  password_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +43,10 @@ export function openDb(path: string): Database.Database {
       PRIMARY KEY (game_id, seq)
     );
     CREATE INDEX IF NOT EXISTS idx_events_live ON events (game_id, undone, seq);
+    CREATE TABLE IF NOT EXISTS roster (
+      name        TEXT PRIMARY KEY,
+      created_at  TEXT NOT NULL
+    );
   `);
   const cols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
   const addCol = (name: string) => {
@@ -49,16 +55,17 @@ export function openDb(path: string): Database.Database {
   addCol('progress_json');
   addCol('share_token');
   addCol('share_json');
+  addCol('password_hash');
   return db;
 }
 
 export class EventStore {
   constructor(private db: Database.Database) {}
 
-  createGame(id: string, title: string, configJson: string, now: string): void {
+  createGame(id: string, title: string, configJson: string, now: string, passwordHash: string | null = null): void {
     this.db
-      .prepare(`INSERT INTO games (id, title, status, config_json, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?)`)
-      .run(id, title, configJson, now, now);
+      .prepare(`INSERT INTO games (id, title, status, config_json, password_hash, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)`)
+      .run(id, title, configJson, passwordHash, now, now);
   }
 
   listGames(): GameRow[] {
@@ -145,5 +152,21 @@ export class EventStore {
 
   getGameByShareToken(token: string): GameRow | undefined {
     return this.db.prepare(`SELECT * FROM games WHERE share_token = ?`).get(token) as GameRow | undefined;
+  }
+
+  /** 建局時把座位名字收進名冊（自動完成來源、未來 Google 綁定的錨點） */
+  upsertRoster(names: string[], now: string): void {
+    const stmt = this.db.prepare(`INSERT OR IGNORE INTO roster (name, created_at) VALUES (?, ?)`);
+    const tx = this.db.transaction(() => {
+      for (const raw of names) {
+        const name = raw.trim();
+        if (name) stmt.run(name, now);
+      }
+    });
+    tx();
+  }
+
+  listRoster(): string[] {
+    return (this.db.prepare(`SELECT name FROM roster ORDER BY name`).all() as { name: string }[]).map((r) => r.name);
   }
 }

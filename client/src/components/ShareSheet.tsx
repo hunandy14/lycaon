@@ -59,10 +59,12 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
 
             {s!.enabled && (
               <>
+                <p className="faint small" style={{ margin: '2px 0 8px' }}>
+                  🌙 夜晚拉夜幕、白天只報今天的戰況（前一天的自己記）；人人同一份、無身份。
+                </p>
                 <Row label="投票明細" hint="每輪票型與棄票（桌上舉手本來就公開；關閉後票型不顯示）" value={s!.showVotes} onChange={(v) => patch({ showVotes: v })} />
                 <Row label="死者身分公開" hint="死亡立即亮牌＝「明牌局」玩法，場上剩餘狼數會變成可推算；標準暗牌局請關閉（終局仍會攤牌）" value={s!.showDeadRoles} onChange={(v) => patch({ showDeadRoles: v })} />
                 <Row label="公開時間軸" hint="GM 口播等級的事件流（夜晚行動、死因、查驗一律不含）" value={s!.showTimeline} onChange={(v) => patch({ showTimeline: v })} />
-                <Row label="死者上帝視角" hint="出局玩家選自己座位後可看全部底牌與夜晚行動。信任制——無法阻止活玩家假冒死者座位，熟人局再開" value={s!.godViewForDead} onChange={(v) => patch({ godViewForDead: v })} />
               </>
             )}
             {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}

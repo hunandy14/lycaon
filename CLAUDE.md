@@ -35,18 +35,24 @@ npx tsc -p engine/tsconfig.json && npx tsc -p server/tsconfig.json   # typecheck
 ## REST API（server/src/routes/games.ts）
 
 ```
-POST /api/games                → 建局 {id}；body = GameConfig
-GET  /api/games                → 列表（含 progress 進度快照；快照存 games.progress_json，append/undo/redo 時更新，舊局懶補）
-GET  /api/games/:id            → { envelopes, redoCount }，client 自行 replay
-POST /api/games/:id/events     → { event, expectedSeq }；409=seq 衝突、400=validate 拒絕（繁中 reason）
-POST /api/games/:id/undo       → { toSeq? }；建局事件不可撤銷；append 會清掉 redo 分支
-POST /api/games/:id/redo
-DELETE /api/games/:id
-GET  /api/games/:id/share      → { token, settings }（GM 端同樂設定）
-POST /api/games/:id/share      → body Partial<ShareSettings>；首次開啟生成 token 後固定
-GET  /api/watch/:token         → 觀戰過濾快照（?seat=N 死者解鎖上帝視角）；未開啟=404
+POST /api/games                → 建局 {id}；body = GameConfig；x-room-password 標頭設管理密碼
+GET  /api/games                → 列表（含 progress 進度快照與 locked 旗標；不含事件流，列表本身不擋、靠 CF）
+GET  /api/games/:id            → { envelopes, redoCount, locked }；上鎖局進行中需 x-room-password（結束後開放讀）
+POST /api/games/:id/events     → { event, expectedSeq }；409=seq 衝突、400=validate 拒絕；寫入永遠需密碼
+POST /api/games/:id/undo       → { toSeq? }；建局事件不可撤銷；append 會清掉 redo 分支；需密碼
+POST /api/games/:id/redo       → 需密碼
+DELETE /api/games/:id          → 需密碼
+GET  /api/games/:id/share      → { token, settings }（GM 端同樂設定；需密碼）
+POST /api/games/:id/share      → body Partial<ShareSettings>；首次開啟生成 token 後固定；需密碼
+GET  /api/watch/:token         → 觀戰過濾快照（統一視角，無 seat 參數）；未開啟=404；不需密碼
 GET  /api/watch/:token/stream  → SSE（append/undo/redo/設定變更時推 update，25s 心跳）
+GET  /api/roster               → { names }（座位名字自動完成清單）
+GET  /api/stats                → { totalGames, players[] }（跨已結束局的玩家勝率/角色分佈聚合）
 ```
+
+管理密碼（`server/src/auth.ts` scrypt）是 CF Access 之外的**第二道鎖**：`checkAuth` 中介——寫入永遠需密碼、
+讀取進行中需密碼結束後開放（報表可分享）；`x-room-password` 標頭傳遞（HTTPS 下明文，定位是「擋一下」非高強度）；
+`password_hash` null=不上鎖（舊局相容）。client 建局裝置自動存 `localStorage(lycaon:pass:<id>)`，換裝置走 UnlockGate。
 
 ## Client（client/src）
 
@@ -72,10 +78,16 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - ✅ **同樂模式**（觀戰端）：GM 於 GamePage「📡 同樂」開關並取得 `/watch/:token` 邀請連結。
   - **過濾一律在 server 端**（engine/src/watch.ts 的 `buildSpectatorView`，防從網路層扒底牌）；
     觀戰 token 與 game id 分離，觀戰者拿不到 GM API。
-  - ShareSettings 開關：`showVotes`/`showDeadRoles`/`showTimeline`/`godViewForDead`；翻牌白癡、
-    自爆狼、翻牌騎士屬「自曝身分」永遠公開；終局全攤牌；死者上帝視角=信任制自選座位。
+  - **統一視角**（無身份、人人同一份）：`buildSpectatorView` 依 `stage`（setup/night/day/ended）——
+    **夜晚拉夜幕**（server 對夜間祕密行動不推 SSE，連時機都藏住）、白天**只報今天**
+    （votes/timeline 過濾成當前 `state.day`，前一天自己記；盤面生死仍為當前狀態）、終局全攤牌。
+  - ShareSettings 開關：`showVotes`/`showDeadRoles`/`showTimeline`；翻牌白癡、自爆狼、翻牌騎士、
+    亮牌開槍屬「自曝身分」永遠公開；夜間死因永不下發（白天死因公開）。
   - SSE：server/src/live.ts 單進程訂閱中樞（PM2 fork 單實例前提）；client EventSource + 30s 保底輪詢。
-- ⬜ 觀戰頁聊天室（可掛在同一 SSE 中樞 + chat 資料表，見計畫）為未來項目。
+- ✅ **房主管理密碼**（`feat/room-auth-stats`）：建局設 4 位數密碼，CF 之外的第二道鎖（見 API 段與部署段）。
+- ✅ **玩家名冊與戰績**：建局座位名字進 `roster` 表（自動完成、未來 Google 綁定錨點）；`/stats` 頁跨已結束局
+  用 `buildGameReport` 聚合每位玩家勝率、當好人/當狼分項、角色分佈（同名視為同一人）。`npm test` 93 綠。
+- ⬜ 觀戰頁聊天室（可掛在同一 SSE 中樞 + chat 資料表）與 Google 登入（綁定名冊繼承戰績）為未來項目。
 
 ## 執行
 
@@ -91,5 +103,7 @@ pm2 start ecosystem.config.cjs   # 常駐（正式部署用；需先 npm run bui
 - **server 預設只綁 `127.0.0.1`**（`HOST` env 可改）。這台機器有公網 IP，外部一律走 Cloudflare Tunnel 從同機 localhost 連入，埠不對外開放以免繞過 Zero Trust。改 server 綁定時務必維持這點。
 - **同樂模式對外開放時**：CF Access 的 bypass 只能放行 `/watch/*` 與 `/api/watch/*`（觀戰端已在 server 端過濾）。
   **`/api/games/*` 絕不可放行**——它無驗證回傳完整事件流（含夜晚行動）且可寫入，放行等於觀戰者拿到 GM 權限。
+- **兩道鎖並存**：房主管理密碼是應用層第二道鎖，但**列表/建局/無密碼舊局仍靠 CF 擋整站**（密碼只保護個別上鎖的局）。
+  若未來要完全撤掉 CF Access（讓場外朋友免 Zero Trust 觀戰），需先補「列表與建局也要身分驗證」，否則首頁全裸。
 - PM2：`ecosystem.config.cjs`（fork 單實例，因 better-sqlite3 單寫入者）。**關鍵**：script 是 `.ts`，PM2 會依副檔名自動選 `bun`，故設定檔已明確指定 `interpreter: 'node'` + `node_args: '--import tsx'`，勿移除。
 - serveStatic 的 root 用 `relative(process.cwd(), clientDist)`：因 `npm start`（cwd=server/）與 PM2（cwd=專案根）的 cwd 不同，這樣兩者都對。

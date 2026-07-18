@@ -9,7 +9,9 @@ export default defineConfig({
     host: true, // 讓手機同網段可連
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:5177',
+      // 代理目標埠跟著 PORT（與 server 同一個 env）：正式站 PM2 佔 5177 時，
+      // worktree 可用 `PORT=5188 npm run dev` 並存，不必停正式站。
+      '/api': `http://localhost:${process.env.PORT ?? 5177}`,
     },
   },
 });

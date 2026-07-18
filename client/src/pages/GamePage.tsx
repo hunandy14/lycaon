@@ -4,6 +4,7 @@ import { useGame } from '../hooks/useGame';
 import { PhaseBanner } from '../components/PhaseBanner';
 import { StatusBar } from '../components/StatusBar';
 import { ShareSheet } from '../components/ShareSheet';
+import { UnlockGate } from '../components/UnlockGate';
 import { Toast } from '../components/Toast';
 import { PhasePanel } from '../panels/PhasePanel';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -19,6 +20,7 @@ export function GamePage() {
   }, [g.state?.config.title]);
 
   if (g.loading) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>載入對局中…</p></div>;
+  if (g.needPassword) return <UnlockGate busy={g.busy} error={g.error} onUnlock={g.unlock} />;
   if (!g.state) {
     return (
       <div className="app">

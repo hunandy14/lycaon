@@ -1,10 +1,38 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { nanoid } from 'nanoid';
 import type { GameConfig, GameEvent, GameProgress, ShareSettings } from '@lycaon/engine';
 import { replay, validate, validateConfig, gameProgress, BOARD_PRESETS, DEFAULT_SHARE } from '@lycaon/engine';
-import type { EventStore } from '../db';
+import type { EventStore, GameRow } from '../db';
+import { hashPassword, verifyPassword } from '../auth';
 import { notify } from '../live';
 import { parseShare } from './watch';
+
+/**
+ * 夜間祕密行動：觀戰端本來就拉夜幕看不到，這些事件不推 SSE——連「更新的時機」都藏住，
+ * 杜絕偷看的活人從推播節奏反推 GM 進行到哪一步。天亮/投票/公佈死訊等照常推。
+ */
+const NIGHT_SECRET_EVENTS = new Set<GameEvent['type']>([
+  'GUARD_ACTED',
+  'WOLVES_ACTED',
+  'SEED_WOLF_ACTED',
+  'WITCH_ACTED',
+  'SEER_ACTED',
+  'CUPID_LINKED',
+]);
+
+/**
+ * 房主管理密碼把關（兩道鎖之一，另一道是 CF Access 擋整站）。
+ * 寫入（事件/undo/redo/刪除/分享設定）永遠需密碼；讀取（GET /:id 完整事件流）在對局
+ * 進行中需密碼、結束後開放（報表/時間軸可直接分享連結）。無設密碼的局（舊局）不上鎖。
+ */
+function checkAuth(game: GameRow, c: Context, forWrite: boolean): Response | null {
+  if (!game.password_hash) return null; // 未設密碼 = 不上鎖
+  if (!forWrite && game.status !== 'active') return null; // 結束/中止後讀取開放
+  const pw = c.req.header('x-room-password');
+  if (pw && verifyPassword(pw, game.password_hash)) return null;
+  return c.json({ error: '需要房主管理密碼', needPassword: true }, 401);
+}
 
 /** 由重播結果同步 games.status（winner → finished；GAME_ABORTED → aborted）與進度快照 */
 function syncStatus(store: EventStore, gameId: string, at?: string): GameProgress | null {
@@ -34,6 +62,7 @@ export function gamesRoutes(store: EventStore): Hono {
         playerCount: config.playerCount,
         presetId: config.presetId ?? 'custom',
         progress,
+        locked: !!g.password_hash,
         createdAt: g.created_at,
         updatedAt: g.updated_at,
       };
@@ -50,8 +79,12 @@ export function gamesRoutes(store: EventStore): Hono {
     const now = new Date().toISOString();
     const preset = BOARD_PRESETS.find((p) => p.id === config.presetId);
     const title = config.title || `${preset?.name ?? `${config.playerCount} 人自訂局`}`;
-    store.createGame(id, title, JSON.stringify(config), now);
+    // 建局密碼經 x-room-password 標頭帶入（空 = 不上鎖）；建局裝置自行存 localStorage
+    const pw = c.req.header('x-room-password');
+    const passwordHash = pw ? hashPassword(pw) : null;
+    store.createGame(id, title, JSON.stringify(config), now, passwordHash);
     store.append(id, { type: 'GAME_CREATED', config }, now);
+    store.upsertRoster(config.seats.map((s) => s.name ?? '').filter(Boolean), now);
     syncStatus(store, id);
     return c.json({ id }, 201);
   });
@@ -59,6 +92,8 @@ export function gamesRoutes(store: EventStore): Hono {
   app.get('/:id', (c) => {
     const game = store.getGame(c.req.param('id'));
     if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, false);
+    if (denied) return denied;
     const envelopes = store.loadEnvelopes(game.id);
     return c.json({
       id: game.id,
@@ -66,19 +101,25 @@ export function gamesRoutes(store: EventStore): Hono {
       status: game.status,
       envelopes,
       redoCount: store.redoCount(game.id),
+      locked: !!game.password_hash,
     });
   });
 
   app.delete('/:id', (c) => {
-    const id = c.req.param('id');
-    if (!store.getGame(id)) return c.json({ error: '對局不存在' }, 404);
-    store.deleteGame(id);
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
+    store.deleteGame(game.id);
     return c.json({ ok: true });
   });
 
   app.post('/:id/events', async (c) => {
     const id = c.req.param('id');
-    if (!store.getGame(id)) return c.json({ error: '對局不存在' }, 404);
+    const game = store.getGame(id);
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
     const body = (await c.req.json()) as { event: GameEvent; expectedSeq: number };
 
     const head = store.headSeq(id);
@@ -93,13 +134,16 @@ export function gamesRoutes(store: EventStore): Hono {
     const now = new Date().toISOString();
     const seq = store.append(id, body.event, now);
     syncStatus(store, id);
-    notify(id);
+    if (!NIGHT_SECRET_EVENTS.has(body.event.type)) notify(id); // 夜間祕密行動不推播
     return c.json({ seq, envelope: { seq, at: now, event: body.event } });
   });
 
   app.post('/:id/undo', async (c) => {
     const id = c.req.param('id');
-    if (!store.getGame(id)) return c.json({ error: '對局不存在' }, 404);
+    const game = store.getGame(id);
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
     const body = (await c.req.json().catch(() => ({}))) as { toSeq?: number };
     try {
       const headSeq = store.undo(id, body.toSeq);
@@ -113,7 +157,10 @@ export function gamesRoutes(store: EventStore): Hono {
 
   app.post('/:id/redo', (c) => {
     const id = c.req.param('id');
-    if (!store.getGame(id)) return c.json({ error: '對局不存在' }, 404);
+    const game = store.getGame(id);
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
     try {
       const headSeq = store.redo(id);
       syncStatus(store, id);
@@ -124,16 +171,20 @@ export function gamesRoutes(store: EventStore): Hono {
     }
   });
 
-  // ── 同樂模式（GM 端）：查詢/更新分享設定 ──
+  // ── 同樂模式（GM 端）：查詢/更新分享設定（皆需房主密碼） ──
   app.get('/:id/share', (c) => {
     const game = store.getGame(c.req.param('id'));
     if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
     return c.json({ token: game.share_token, settings: parseShare(game) });
   });
 
   app.post('/:id/share', async (c) => {
     const game = store.getGame(c.req.param('id'));
     if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
     const patch = (await c.req.json().catch(() => ({}))) as Partial<ShareSettings>;
     const settings: ShareSettings = { ...DEFAULT_SHARE, ...parseShare(game), ...patch };
     // token 首次開啟時生成，之後固定（開關不換連結）

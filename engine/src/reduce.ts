@@ -166,8 +166,8 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
         next.phase = { t: 'day', stage: 'sheriff' };
         pushLog(ctx, '天亮了，進入警長競選', false);
       } else {
+        // 不記「天亮了」——死訊公佈（DEATHS_ANNOUNCED）那句「天亮了。昨晚死亡…」已含此意，避免重複
         next.phase = { t: 'day', stage: 'announce' };
-        pushLog(ctx, '天亮了', false);
       }
       break;
     }
