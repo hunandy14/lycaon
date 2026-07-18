@@ -161,6 +161,14 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ nick, text, scope }) },
     ),
 
+  /** GM 聊天監看：一次回兩房歷史（需房主密碼） */
+  getGmChat: (id: string) =>
+    req<{ watch: ChatMessage[]; ghost: ChatMessage[] }>(`/games/${id}/chat`, undefined, roomPass.get(id)),
+
+  /** GM 發言：nick 固定 'GM'、isGm=1，server 端免 rate limit（需房主密碼） */
+  sendGmChat: (id: string, scope: ChatScope, text: string) =>
+    req<ChatMessage>(`/games/${id}/chat`, { method: 'POST', body: JSON.stringify({ scope, text }) }, roomPass.get(id)),
+
   getRoster: () => req<{ names: string[] }>('/roster').then((r) => r.names),
 
   getStats: () => req<{ totalGames: number; players: PlayerStat[] }>('/stats'),
