@@ -14,6 +14,8 @@ export interface GameRow {
   share_token: string | null;
   /** ShareSettings JSON（null = 從未開過同樂模式） */
   share_json: string | null;
+  /** 房主管理密碼雜湊（scrypt，格式 salt:hex；null = 舊局或不設密碼，不上鎖） */
+  password_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,16 +51,17 @@ export function openDb(path: string): Database.Database {
   addCol('progress_json');
   addCol('share_token');
   addCol('share_json');
+  addCol('password_hash');
   return db;
 }
 
 export class EventStore {
   constructor(private db: Database.Database) {}
 
-  createGame(id: string, title: string, configJson: string, now: string): void {
+  createGame(id: string, title: string, configJson: string, now: string, passwordHash: string | null = null): void {
     this.db
-      .prepare(`INSERT INTO games (id, title, status, config_json, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?)`)
-      .run(id, title, configJson, now, now);
+      .prepare(`INSERT INTO games (id, title, status, config_json, password_hash, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)`)
+      .run(id, title, configJson, passwordHash, now, now);
   }
 
   listGames(): GameRow[] {
