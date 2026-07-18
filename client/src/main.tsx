@@ -9,6 +9,7 @@ import { GamePage } from './pages/GamePage';
 import { TimelinePage } from './pages/TimelinePage';
 import { ReportPage } from './pages/ReportPage';
 import { WatchPage } from './pages/WatchPage';
+import { GhostPage } from './pages/GhostPage';
 import { StatsPage } from './pages/StatsPage';
 
 const router = createBrowserRouter([
@@ -18,6 +19,7 @@ const router = createBrowserRouter([
   { path: '/game/:id/timeline', element: <TimelinePage /> },
   { path: '/game/:id/report', element: <ReportPage /> },
   { path: '/watch/:token', element: <WatchPage /> },
+  { path: '/ghost/:token', element: <GhostPage /> },
   { path: '/stats', element: <StatsPage /> },
 ]);
 
