@@ -45,7 +45,10 @@ DELETE /api/games/:id          → 需密碼
 GET  /api/games/:id/share      → { token, settings }（GM 端同樂設定；需密碼）
 POST /api/games/:id/share      → body Partial<ShareSettings>；首次開啟生成 token 後固定；需密碼
 GET  /api/watch/:token         → 觀戰過濾快照（統一視角，無 seat 參數）；未開啟=404；不需密碼
-GET  /api/watch/:token/stream  → SSE（append/undo/redo/設定變更時推 update，25s 心跳）
+GET  /api/watch/:token/stream  → SSE（update：append/undo/redo/設定變更，25s 心跳；chat：新聊天訊息即時推送）
+GET  /api/watch/:token/chat    → { messages }（最近 50 則，依 id 升冪）；未開啟=404；不需密碼
+POST /api/watch/:token/chat    → body { nick, text }；nick 1–12 字、text 1–200 字（trim 後）；
+                                  同 IP 每 token 3 秒 1 則（429）；400=長度不符、404=未開啟/連結無效；不需密碼
 GET  /api/roster               → { names }（座位名字自動完成清單）
 GET  /api/stats                → { totalGames, players[] }（跨已結束局的玩家勝率/角色分佈聚合）
 ```
@@ -87,7 +90,13 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - ✅ **房主管理密碼**（`feat/room-auth-stats`）：建局設 4 位數密碼，CF 之外的第二道鎖（見 API 段與部署段）。
 - ✅ **玩家名冊與戰績**：建局座位名字進 `roster` 表（自動完成、未來 Google 綁定錨點）；`/stats` 頁跨已結束局
   用 `buildGameReport` 聚合每位玩家勝率、當好人/當狼分項、角色分佈（同名視為同一人）。`npm test` 93 綠。
-- ⬜ 觀戰頁聊天室（可掛在同一 SSE 中樞 + chat 資料表）與 Google 登入（綁定名冊繼承戰績）為未來項目。
+- ✅ **觀戰頁聊天室**：獨立 `chat` 資料表（`server/src/db.ts` 的 `appendChat`/`listChat`），**不進 events 表、不經
+  reducer、與 undo/redo 無關**。掛在 `/api/watch/:token/chat`（GET 歷史 50 則、POST 送出），免密碼、token 無效或
+  同樂未開啟一律 404。`server/src/live.ts` 的 `LiveEvent` 擴充為 `{kind:'update'} | {kind:'chat', message}`——
+  聊天走 `notifyChat`，觀戰 SSE 收到 `chat` 事件直接 append（不重拉快照）；`update` 行為不變。
+  Rate limit：同 token 同 IP 每 3 秒 1 則（in-memory Map，單進程前提同 live.ts）。WatchPage 底部聊天區，
+  暱稱存 `localStorage(lycaon:chatnick)`，XSS 靠 React 純文字渲染（不用 dangerouslySetInnerHTML）。
+- ⬜ Google 登入（綁定名冊繼承戰績）為未來項目。
 
 ## 執行
 
