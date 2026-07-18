@@ -77,7 +77,7 @@ export function watchRoutes(store: EventStore): Hono {
   app.get('/:token/chat', (c) => {
     const hit = resolve(c.req.param('token'));
     if (!hit || !hit.settings.showChat) return c.json({ error: '同樂模式未開啟或連結無效' }, 404);
-    return c.json({ messages: store.listChat(hit.game.id, 50) });
+    return c.json({ messages: store.listChat(hit.game.id, 'watch', 50) });
   });
 
   app.post('/:token/chat', async (c) => {
@@ -105,7 +105,7 @@ export function watchRoutes(store: EventStore): Hono {
     }
     lastChatAt.set(rateKey, now);
 
-    const message = store.appendChat(hit.game.id, nick, text, new Date().toISOString());
+    const message = store.appendChat(hit.game.id, nick, text, new Date().toISOString(), 'watch');
     notifyChat(hit.game.id, message);
     return c.json(message, 201);
   });

@@ -16,16 +16,23 @@ export interface GameRow {
   share_json: string | null;
   /** 房主管理密碼雜湊（scrypt，格式 salt:hex；null = 舊局或不設密碼，不上鎖） */
   password_hash: string | null;
+  /** 陰間（死者視角）邀請 token（一局一個，開啟時生成後固定） */
+  ghost_token: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** 觀戰頁聊天訊息（獨立於 events，不進 reducer/undo） */
+/** 聊天房別：觀戰端「陽間」或死者視角「陰間」 */
+export type ChatScope = 'watch' | 'ghost';
+
+/** 觀戰/陰間聊天訊息（獨立於 events，不進 reducer/undo） */
 export interface ChatMessage {
   id: number;
   gameId: string;
   nick: string;
   text: string;
+  scope: ChatScope;
+  isGm: boolean;
   createdAt: string;
 }
 
@@ -61,18 +68,24 @@ export function openDb(path: string): Database.Database {
       game_id    TEXT NOT NULL,
       nick       TEXT NOT NULL,
       text       TEXT NOT NULL,
+      scope      TEXT NOT NULL DEFAULT 'watch',
+      is_gm      INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_chat_game ON chat (game_id, id);
+    CREATE INDEX IF NOT EXISTS idx_chat_game ON chat (game_id, scope, id);
   `);
-  const cols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
-  const addCol = (name: string) => {
-    if (!cols.some((c) => c.name === name)) db.exec(`ALTER TABLE games ADD COLUMN ${name} TEXT`);
+  const gameCols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
+  const addCol = (table: string, cols: { name: string }[], name: string, decl = 'TEXT') => {
+    if (!cols.some((c) => c.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${decl}`);
   };
-  addCol('progress_json');
-  addCol('share_token');
-  addCol('share_json');
-  addCol('password_hash');
+  addCol('games', gameCols, 'progress_json');
+  addCol('games', gameCols, 'share_token');
+  addCol('games', gameCols, 'share_json');
+  addCol('games', gameCols, 'password_hash');
+  addCol('games', gameCols, 'ghost_token');
+  const chatCols = db.prepare(`PRAGMA table_info(chat)`).all() as { name: string }[];
+  addCol('chat', chatCols, 'scope', `TEXT NOT NULL DEFAULT 'watch'`);
+  addCol('chat', chatCols, 'is_gm', `INTEGER NOT NULL DEFAULT 0`);
   return db;
 }
 
@@ -171,6 +184,14 @@ export class EventStore {
     return this.db.prepare(`SELECT * FROM games WHERE share_token = ?`).get(token) as GameRow | undefined;
   }
 
+  updateGhost(gameId: string, token: string): void {
+    this.db.prepare(`UPDATE games SET ghost_token = ? WHERE id = ?`).run(token, gameId);
+  }
+
+  getGameByGhostToken(token: string): GameRow | undefined {
+    return this.db.prepare(`SELECT * FROM games WHERE ghost_token = ?`).get(token) as GameRow | undefined;
+  }
+
   /** 建局時把座位名字收進名冊（自動完成來源、未來 Google 綁定的錨點） */
   upsertRoster(names: string[], now: string): void {
     const stmt = this.db.prepare(`INSERT OR IGNORE INTO roster (name, created_at) VALUES (?, ?)`);
@@ -187,23 +208,39 @@ export class EventStore {
     return (this.db.prepare(`SELECT name FROM roster ORDER BY name`).all() as { name: string }[]).map((r) => r.name);
   }
 
-  /** 寫入一則聊天訊息，回傳完整 ChatMessage */
-  appendChat(gameId: string, nick: string, text: string, now: string): ChatMessage {
+  /** 寫入一則聊天訊息，回傳完整 ChatMessage。scope 分房；isGm=GM 端發言（金色徽章、免 rate limit 由呼叫端處理） */
+  appendChat(gameId: string, nick: string, text: string, now: string, scope: ChatScope, isGm = false): ChatMessage {
     const info = this.db
-      .prepare(`INSERT INTO chat (game_id, nick, text, created_at) VALUES (?, ?, ?, ?)`)
-      .run(gameId, nick, text, now);
-    return { id: Number(info.lastInsertRowid), gameId, nick, text, createdAt: now };
+      .prepare(`INSERT INTO chat (game_id, nick, text, scope, is_gm, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(gameId, nick, text, scope, isGm ? 1 : 0, now);
+    return { id: Number(info.lastInsertRowid), gameId, nick, text, scope, isGm, createdAt: now };
   }
 
-  /** 最近 N 則聊天訊息（依 id 升冪） */
-  listChat(gameId: string, limit = 50): ChatMessage[] {
+  /** 指定房別最近 N 則聊天訊息（依 id 升冪） */
+  listChat(gameId: string, scope: ChatScope, limit = 50): ChatMessage[] {
     const rows = this.db
       .prepare(
-        `SELECT id, game_id, nick, text, created_at FROM chat WHERE game_id = ? ORDER BY id DESC LIMIT ?`
+        `SELECT id, game_id, nick, text, scope, is_gm, created_at FROM chat WHERE game_id = ? AND scope = ? ORDER BY id DESC LIMIT ?`
       )
-      .all(gameId, limit) as { id: number; game_id: string; nick: string; text: string; created_at: string }[];
+      .all(gameId, scope, limit) as {
+      id: number;
+      game_id: string;
+      nick: string;
+      text: string;
+      scope: ChatScope;
+      is_gm: number;
+      created_at: string;
+    }[];
     return rows
       .reverse()
-      .map((r) => ({ id: r.id, gameId: r.game_id, nick: r.nick, text: r.text, createdAt: r.created_at }));
+      .map((r) => ({
+        id: r.id,
+        gameId: r.game_id,
+        nick: r.nick,
+        text: r.text,
+        scope: r.scope,
+        isGm: !!r.is_gm,
+        createdAt: r.created_at,
+      }));
   }
 }
