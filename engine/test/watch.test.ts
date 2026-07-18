@@ -50,7 +50,7 @@ describe('buildSpectatorView（統一視角）', () => {
       expect(p.lover).toBe(false);
       expect(p.converted).toBe(false);
     }
-    expect(v.players.find((p) => p.seat === 5)).toMatchObject({ alive: false, deathAt: '第 1 夜', deathCause: null });
+    expect(v.players.find((p) => p.seat === 5)).toMatchObject({ alive: false, deathAt: null, deathCause: null }); // showDeathInfo 預設關
     expect(v.timeline!.every((e) => !e.secret)).toBe(true);
     expect(v.timeline!.some((e) => e.text.includes('查驗'))).toBe(false);
     const json = JSON.stringify(v);
@@ -101,15 +101,27 @@ describe('buildSpectatorView（統一視角）', () => {
 
   it('showDeadRoles 開才公開死者身分；白天死因公開、夜間死因永不下發', () => {
     const { state } = midGame();
-    const hidden = buildSpectatorView(state, SETTINGS);
+    const di = { ...SETTINGS, showDeathInfo: true };
+    const hidden = buildSpectatorView(state, di);
     expect(hidden.players.find((p) => p.seat === 9)!.role).toBeNull();
     expect(hidden.players.find((p) => p.seat === 9)!.deathCause).toBe('被投票放逐'); // 白天死因公開
     expect(hidden.players.find((p) => p.seat === 5)!.deathCause).toBeNull(); // 夜間死因不給
 
-    const shown = buildSpectatorView(state, { ...SETTINGS, showDeadRoles: true });
+    const shown = buildSpectatorView(state, { ...di, showDeadRoles: true });
     expect(shown.players.find((p) => p.seat === 9)!).toMatchObject({ role: 'werewolf', deathCause: '被投票放逐' });
     expect(shown.players.find((p) => p.seat === 1)!.role).toBeNull(); // 活人仍隱藏
     expect(shown.players.find((p) => p.seat === 5)!).toMatchObject({ role: 'villager', deathCause: null }); // 明牌局翻牌不翻死法
+  });
+
+  it('showDeathInfo 預設關：死亡時間/死因整組不下發；開了才給、夜間死因仍不給', () => {
+    const { state } = midGame();
+    const off = buildSpectatorView(state, SETTINGS);
+    expect(off.players.find((p) => p.seat === 9)!).toMatchObject({ alive: false, deathAt: null, deathCause: null });
+    expect(off.players.find((p) => p.seat === 5)!).toMatchObject({ alive: false, deathAt: null, deathCause: null });
+
+    const on = buildSpectatorView(state, { ...SETTINGS, showDeathInfo: true });
+    expect(on.players.find((p) => p.seat === 9)!).toMatchObject({ deathAt: '第 1 天', deathCause: '被投票放逐' });
+    expect(on.players.find((p) => p.seat === 5)!).toMatchObject({ deathAt: '第 1 夜', deathCause: null });
   });
 
   it('自曝身分：放棄開槍不進時間軸且不亮牌；亮牌開槍亮牌', () => {
