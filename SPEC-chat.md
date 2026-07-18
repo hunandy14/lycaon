@@ -13,7 +13,8 @@
    測試 DB 一律 `:memory:`（跟 server/test/store.test.ts 一樣）。
 5. XSS：client 只用 React 純文字渲染（不用 dangerouslySetInnerHTML）；server 存原文即可。
 6. UI 繁體中文、手機直式，沿用既有暗色主題 CSS 變數。
-7. 每步完成後閘門：`npm test && npx tsc -p server/tsconfig.json` 全綠才 commit。
+7. 每步完成後閘門：`npm test && npx tsc -p server/tsconfig.json` 全綠才 commit；
+   **該步若有動 client/，閘門加跑 `npx tsc -p client/tsconfig.json`**。
    commit 訊息格式：`chat step N: <摘要>`。
 
 ## 架構拍板（不要重新發明）
