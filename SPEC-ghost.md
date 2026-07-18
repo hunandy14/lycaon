@@ -80,7 +80,7 @@ GM 面板加聊天監看視窗（雙分頁、可發言）。
 - [x] 6. **GhostPage**：路由、開天眼、全知盤面、雙聊天室、canReveal=false 隱藏開眼。
 - [x] 7. **同樂面板陰間卡**：啟用/連結+複製+QR/可開眼，比照邀請連結卡格式。
 - [x] 8. **GM 聊天 sheet**：底部列 icon、雙分頁、GM 徽章發言、未讀紅點。
-- [ ] 9. **文件與總驗**：CLAUDE.md 補 API 表與進度、部署段補「CF bypass 需加 /ghost/* 與 /api/ghost/*（場外待辦）」；
+- [x] 9. **文件與總驗**：CLAUDE.md 補 API 表與進度、部署段補「CF bypass 需加 /ghost/* 與 /api/ghost/*（場外待辦）」；
       跑全閘門含 client tsc 與 `npm run build`。
 
 ## 已知教訓（卡住時把修正寫在這，給下一輪看）
