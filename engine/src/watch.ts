@@ -25,6 +25,8 @@ export interface ShareSettings {
   showDeadRoles: boolean;
   /** 公開時間軸（GM 口播等級的公開事件） */
   showTimeline: boolean;
+  /** 觀戰聊天室（預設關；關閉時歷史與發言 API 一律拒絕） */
+  showChat: boolean;
 }
 
 export const DEFAULT_SHARE: ShareSettings = {
@@ -32,6 +34,7 @@ export const DEFAULT_SHARE: ShareSettings = {
   showVotes: true,
   showDeadRoles: false,
   showTimeline: true,
+  showChat: false,
 };
 
 /** 觀戰畫面階段：準備 / 夜幕 / 今日戰況 / 終局 */
@@ -187,6 +190,7 @@ export function buildSpectatorView(state: GameState, settings: ShareSettings, re
       showVotes: settings.showVotes,
       showDeadRoles: settings.showDeadRoles,
       showTimeline: settings.showTimeline,
+      showChat: settings.showChat,
     },
   };
 }

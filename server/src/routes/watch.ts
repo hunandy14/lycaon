@@ -76,13 +76,13 @@ export function watchRoutes(store: EventStore): Hono {
 
   app.get('/:token/chat', (c) => {
     const hit = resolve(c.req.param('token'));
-    if (!hit) return c.json({ error: '同樂模式未開啟或連結無效' }, 404);
+    if (!hit || !hit.settings.showChat) return c.json({ error: '同樂模式未開啟或連結無效' }, 404);
     return c.json({ messages: store.listChat(hit.game.id, 50) });
   });
 
   app.post('/:token/chat', async (c) => {
     const hit = resolve(c.req.param('token'));
-    if (!hit) return c.json({ error: '同樂模式未開啟或連結無效' }, 404);
+    if (!hit || !hit.settings.showChat) return c.json({ error: '同樂模式未開啟或連結無效' }, 404);
 
     let body: { nick?: unknown; text?: unknown };
     try {

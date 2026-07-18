@@ -64,6 +64,7 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
                 </p>
                 <Row label="投票明細" hint="每輪票型與棄票（桌上舉手本來就公開；關閉後票型不顯示）" value={s!.showVotes} onChange={(v) => patch({ showVotes: v })} />
                 <Row label="公開時間軸" hint="GM 口播等級的事件流（夜晚行動、死因、查驗一律不含）" value={s!.showTimeline} onChange={(v) => patch({ showTimeline: v })} />
+                <Row label="聊天室" hint="觀戰頁的聊天區；關閉後不顯示也不能發言" value={s!.showChat} onChange={(v) => patch({ showChat: v })} />
               </>
             )}
             {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}

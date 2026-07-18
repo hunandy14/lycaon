@@ -15,7 +15,7 @@ const config: GameConfig = {
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
-function setup(shareOverrides: Partial<typeof DEFAULT_SHARE> = { enabled: true }) {
+function setup(shareOverrides: Partial<typeof DEFAULT_SHARE> = { enabled: true, showChat: true }) {
   const store = new EventStore(openDb(':memory:'));
   store.createGame('g1', 'test', JSON.stringify(config), NOW);
   store.append('g1', { type: 'GAME_CREATED', config }, NOW);
@@ -116,6 +116,21 @@ describe('觀戰聊天室', () => {
       body: JSON.stringify({ nick: '小明', text: '哈囉' }),
     });
     expect(post.status).toBe(404);
+  });
+
+  it('聊天室開關：showChat=false 時 GET/POST 皆回 404（同樂其餘功能不受影響）', async () => {
+    const { app, token } = setup({ enabled: true, showChat: false });
+    const get = await app.request(`/api/watch/${token}/chat`);
+    expect(get.status).toBe(404);
+    const post = await app.request(`/api/watch/${token}/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': '1.1.1.1' },
+      body: JSON.stringify({ nick: '小明', text: '哈囉' }),
+    });
+    expect(post.status).toBe(404);
+    // 觀戰快照本身仍可讀
+    const view = await app.request(`/api/watch/${token}`);
+    expect(view.status).toBe(200);
   });
 
   it('rate limit：同一 IP 3 秒內第二則回 429，間隔後恢復正常', async () => {
