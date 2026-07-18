@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import type { SeatId, ShareSettings } from '@lycaon/engine';
+import type { ShareSettings } from '@lycaon/engine';
 import { buildGameReport, buildSpectatorView, replay, DEFAULT_SHARE } from '@lycaon/engine';
 import type { EventStore, GameRow } from '../db';
 import { subscribe } from '../live';
@@ -32,14 +32,10 @@ export function watchRoutes(store: EventStore): Hono {
     if (!hit) return c.json({ error: '同樂模式未開啟或連結無效' }, 404);
     const { game, settings } = hit;
 
-    const seatRaw = c.req.query('seat');
-    const seat = seatRaw ? (Number(seatRaw) as SeatId) : null;
-    const viewerSeat = seat !== null && Number.isInteger(seat) && seat > 0 ? seat : null;
-
     const envelopes = store.loadEnvelopes(game.id);
     const state = replay(envelopes);
     const report = buildGameReport(envelopes);
-    const view = buildSpectatorView(state, settings, viewerSeat, report);
+    const view = buildSpectatorView(state, settings, report);
     return c.json({ title: game.title, ...view });
   });
 

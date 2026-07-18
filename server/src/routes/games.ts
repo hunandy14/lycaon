@@ -9,6 +9,19 @@ import { notify } from '../live';
 import { parseShare } from './watch';
 
 /**
+ * 夜間祕密行動：觀戰端本來就拉夜幕看不到，這些事件不推 SSE——連「更新的時機」都藏住，
+ * 杜絕偷看的活人從推播節奏反推 GM 進行到哪一步。天亮/投票/公佈死訊等照常推。
+ */
+const NIGHT_SECRET_EVENTS = new Set<GameEvent['type']>([
+  'GUARD_ACTED',
+  'WOLVES_ACTED',
+  'SEED_WOLF_ACTED',
+  'WITCH_ACTED',
+  'SEER_ACTED',
+  'CUPID_LINKED',
+]);
+
+/**
  * 房主管理密碼把關（兩道鎖之一，另一道是 CF Access 擋整站）。
  * 寫入（事件/undo/redo/刪除/分享設定）永遠需密碼；讀取（GET /:id 完整事件流）在對局
  * 進行中需密碼、結束後開放（報表/時間軸可直接分享連結）。無設密碼的局（舊局）不上鎖。
@@ -121,7 +134,7 @@ export function gamesRoutes(store: EventStore): Hono {
     const now = new Date().toISOString();
     const seq = store.append(id, body.event, now);
     syncStatus(store, id);
-    notify(id);
+    if (!NIGHT_SECRET_EVENTS.has(body.event.type)) notify(id); // 夜間祕密行動不推播
     return c.json({ seq, envelope: { seq, at: now, event: body.event } });
   });
 
