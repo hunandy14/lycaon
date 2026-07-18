@@ -36,7 +36,7 @@
       （routes/games.ts 等）為 `{kind:'update'}`；watch stream 的 subscribe 對應轉發（update 照舊、chat 先忽略）。
 - [x] 3. **聊天路由**：routes/watch.ts 加 `GET /:token/chat`（最近 50 則）與
       `POST /:token/chat`（body `{nick, text}`，驗證長度與 rate limit，成功後 appendChat + notify chat）。
-- [ ] 4. **server 測試**：server/test/chat.test.ts —— 覆蓋：存取歷史、長度驗證、token 無效 404、
+- [x] 4. **server 測試**：server/test/chat.test.ts —— 覆蓋：存取歷史、長度驗證、token 無效 404、
       同樂關閉後拒收、rate limit。照 store.test.ts 的 `:memory:` 寫法。
 - [ ] 5. **client 觀戰頁 UI**：WatchPage 底部聊天區——訊息列表（暱稱+內容+時間）、輸入框與送出、
       暱稱首次輸入後存 `localStorage(lycaon:chatnick)`；進頁 GET 歷史、EventSource 監聽 `chat` 事件 append。
