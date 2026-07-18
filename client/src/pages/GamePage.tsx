@@ -11,11 +11,13 @@ import { PhasePanel } from '../panels/PhasePanel';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { api } from '../api';
 import { GmChatSheet, chatSeenKey } from '../components/GmChatSheet';
+import { GhostSheet } from '../components/GhostSheet';
 
 export function GamePage() {
   const { id = '' } = useParams();
   const g = useGame(id);
   const [shareOpen, setShareOpen] = useState(false);
+  const [ghostOpen, setGhostOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatAvailable, setChatAvailable] = useState(false);
   const [chatUnread, setChatUnread] = useState(false);
@@ -89,6 +91,7 @@ export function GamePage() {
 
       <div className="row" style={{ marginTop: 20, justifyContent: 'center', gap: 16 }}>
         <button className="btn btn-ghost btn-sm faint" onClick={() => setShareOpen(true)}>📡 同樂</button>
+        <button className="btn btn-ghost btn-sm faint" onClick={() => setGhostOpen(true)}>👻 陰間</button>
         {chatAvailable && (
           <button
             className="btn btn-ghost btn-sm faint"
@@ -120,6 +123,7 @@ export function GamePage() {
       </div>
 
       {shareOpen && <ShareSheet id={id} onClose={() => setShareOpen(false)} />}
+      {ghostOpen && <GhostSheet id={id} onClose={() => setGhostOpen(false)} />}
       {chatOpen && <GmChatSheet id={id} onClose={() => setChatOpen(false)} />}
       <Toast message={g.error} onClose={g.clearError} />
     </div>
