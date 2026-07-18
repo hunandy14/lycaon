@@ -185,7 +185,7 @@ export function WatchPage() {
         </>
       )}
 
-      <WatchChat token={token} live={live} />
+      <WatchChat token={token} live={live} disabled={!!error} />
     </div>
   );
 }

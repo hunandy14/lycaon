@@ -42,7 +42,7 @@
 - [x] 5. **client 觀戰頁 UI**：WatchPage 底部聊天區——訊息列表（暱稱+內容+時間）、輸入框與送出、
       暱稱首次輸入後存 `localStorage(lycaon:chatnick)`；進頁 GET 歷史、EventSource 監聽 `chat` 事件 append。
       樣式進 components.css，沿用暗色主題。
-- [ ] 6. **邊界收尾**：終局（stage=ended）聊天維持可用；同樂關閉時 UI 顯示禁用；
+- [x] 6. **邊界收尾**：終局（stage=ended）聊天維持可用；同樂關閉時 UI 顯示禁用；
       送出失敗（429/400）Toast 提示；訊息列表自動捲到底但使用者上捲時不搶捲動。
 - [ ] 7. **文件與總驗**：更新 CLAUDE.md 的 API 清單與進度區（聊天室打勾）；
       跑 `npm test && npx tsc -p server/tsconfig.json && npx tsc -p client/tsconfig.json`（若 client 無獨立 tsconfig 則以 `npm run build` 代替）全綠。

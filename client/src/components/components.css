@@ -1052,6 +1052,10 @@
   padding: 8px 10px;
   font-size: 0.85rem;
 }
+.chat-input-row .text-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ---------- 觀戰夜幕 ---------- */
 .night-curtain {
