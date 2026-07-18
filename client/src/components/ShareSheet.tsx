@@ -11,6 +11,9 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  const [ghostCopied, setGhostCopied] = useState(false);
+  const [showGhostQr, setShowGhostQr] = useState(false);
+  const [ghostQr, setGhostQr] = useState<string | null>(null);
 
   useEffect(() => {
     api.getShare(id).then(setInfo).catch((e) => setErr((e as Error).message));
@@ -28,6 +31,7 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
 
   const s = info?.settings;
   const url = info?.token && s?.enabled ? `${location.origin}/watch/${info.token}` : null;
+  const ghostUrl = info?.ghostToken && s?.ghostEnabled ? `${location.origin}/ghost/${info.ghostToken}` : null;
 
   // QR 純前端生成（掃了直接進觀戰頁）
   useEffect(() => {
@@ -35,6 +39,12 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
       QRCode.toDataURL(url, { width: 440, margin: 1 }).then(setQr).catch(() => setQr(null));
     }
   }, [url, showQr]);
+
+  useEffect(() => {
+    if (ghostUrl && showGhostQr) {
+      QRCode.toDataURL(ghostUrl, { width: 440, margin: 1 }).then(setGhostQr).catch(() => setGhostQr(null));
+    }
+  }, [ghostUrl, showGhostQr]);
 
   const copy = async () => {
     if (!url) return;
@@ -44,6 +54,17 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
       setTimeout(() => setCopied(false), 1500);
     } catch {
       prompt('手動複製連結：', url);
+    }
+  };
+
+  const copyGhost = async () => {
+    if (!ghostUrl) return;
+    try {
+      await navigator.clipboard.writeText(ghostUrl);
+      setGhostCopied(true);
+      setTimeout(() => setGhostCopied(false), 1500);
+    } catch {
+      prompt('手動複製連結：', ghostUrl);
     }
   };
 
@@ -103,6 +124,61 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
                   <button className="btn btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setShowQr(false)}>關閉</button>
                 </div>
               </div>
+            )}
+
+            <div className="panel-title" style={{ marginTop: 18, fontSize: '1rem' }}>👻 陰間</div>
+            <div className="panel-hint">給已死玩家的專屬連結；預設與觀戰同視角，開啟「開眼」才能看全部底牌。</div>
+
+            <Row label="開啟陰間連結" hint="關閉後連結立即失效；重新開啟連結不變" value={s!.ghostEnabled} onChange={(v) => patch({ ghostEnabled: v })} />
+
+            {ghostUrl && (
+              <div className="card" style={{ padding: 12, marginBottom: 8 }}>
+                <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>死者連結</div>
+                    <div className="faint small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ghostUrl}</div>
+                  </div>
+                  <button className="btn btn-sm" onClick={copyGhost} aria-label="複製死者連結" style={{ display: 'inline-flex', padding: 9 }}>
+                    {ghostCopied ? <Check size={17} /> : <Copy size={17} />}
+                  </button>
+                  <button
+                    className={`btn btn-sm ${showGhostQr ? 'btn-primary' : ''}`}
+                    onClick={() => setShowGhostQr((v) => !v)}
+                    aria-label="顯示 QR Code"
+                    style={{ display: 'inline-flex', padding: 9 }}
+                  >
+                    <QrIcon size={17} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showGhostQr && ghostQr && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowGhostQr(false);
+                }}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 60,
+                  background: 'rgba(0,0,0,0.65)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div className="panel center" style={{ padding: 18 }} onClick={(e) => e.stopPropagation()}>
+                  <img src={ghostQr} alt="死者連結 QR Code" style={{ width: 'min(64vw, 280px)', height: 'auto', borderRadius: 12, background: '#fff', padding: 10 }} />
+                  <div className="faint small" style={{ marginTop: 8 }}>掃碼直接進陰間頁</div>
+                  <button className="btn btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setShowGhostQr(false)}>關閉</button>
+                </div>
+              </div>
+            )}
+
+            {s!.ghostEnabled && (
+              <Row label="死者可開眼看底牌" hint="開啟後死者連結可切換全知視角：全部身分、完整夜晚行動與查驗結果" value={s!.ghostCanReveal} onChange={(v) => patch({ ghostCanReveal: v })} />
             )}
 
             {s!.enabled && (
