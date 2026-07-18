@@ -124,8 +124,8 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
                     onClick={() => patch({ showAllDays: !s!.showAllDays })}
                   >
                     <div className="grow">
-                      <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>報所有天數的戰況</div>
-                      <div className="faint small">投票與時間軸含之前每一天；關閉時只報今天（前一天的自己記）</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>全程戰況</div>
+                      <div className="faint small">從第 1 天到現在的投票與事件都看得到；關閉時只報今天（前一天的自己記）</div>
                     </div>
                     <div className={`toggle ${s!.showAllDays ? 'on' : ''}`}>
                       <div className="toggle-knob" />
