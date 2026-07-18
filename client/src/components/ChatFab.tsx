@@ -12,6 +12,7 @@ export function ChatFab({
   open,
   onToggle,
   slot = 0,
+  headerExtra,
   children,
 }: {
   icon: LucideIcon;
@@ -21,6 +22,8 @@ export function ChatFab({
   open: boolean;
   onToggle: () => void;
   slot?: number;
+  /** 標題列右側附加內容（如暱稱 chip），排在關閉鈕左邊 */
+  headerExtra?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -42,6 +45,7 @@ export function ChatFab({
             <span className="fab-panel-title">
               <Icon size={16} /> {label}
             </span>
+            {headerExtra}
             <button type="button" className="fab-panel-close" aria-label="關閉" onClick={onToggle}>
               <X size={18} />
             </button>

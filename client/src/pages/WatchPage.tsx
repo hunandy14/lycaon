@@ -5,7 +5,7 @@ import type { SpectatorVote } from '@lycaon/engine';
 import { api, type WatchData } from '../api';
 import { factionColor, roleShort } from '../ui/roleStyle';
 import { ChatFab } from '../components/ChatFab';
-import { ChatRoom } from '../components/ChatRoom';
+import { ChatRoom, NickChip } from '../components/ChatRoom';
 import { useChatUnread } from '../hooks/useChatUnread';
 
 /** 勝方樣式（GhostPage 全知終局畫面共用） */
@@ -201,6 +201,7 @@ export function WatchPage() {
           open={chatOpen}
           onToggle={() => setChatOpen((v) => !v)}
           slot={0}
+          headerExtra={<NickChip />}
         >
           <ChatRoom token={token} live={live} disabled={!!error} />
         </ChatFab>

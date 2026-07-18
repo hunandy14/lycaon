@@ -1,8 +1,60 @@
 import { useEffect, useRef, useState } from 'react';
+import { Check, Pencil, SendHorizontal } from 'lucide-react';
 import { api, type ChatMessage, type ChatScope } from '../api';
 import { Toast } from './Toast';
 
 const NICK_KEY = 'lycaon:chatnick';
+/** NickChip 改名時廣播，讓同頁所有 ChatRoom 同步拿到新暱稱 */
+const NICK_EVENT = 'lycaon-nick-changed';
+
+/** 暱稱 chip（放在 ChatFab 標題列）：顯示目前暱稱，點了原地改，存 localStorage 全站共用 */
+export function NickChip() {
+  const [nick, setNick] = useState(() => localStorage.getItem(NICK_KEY) ?? '');
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const start = () => {
+    setDraft(nick);
+    setEditing(true);
+  };
+  const save = () => {
+    const v = draft.trim().slice(0, 12);
+    setEditing(false);
+    if (!v || v === nick) return;
+    setNick(v);
+    localStorage.setItem(NICK_KEY, v);
+    window.dispatchEvent(new Event(NICK_EVENT));
+  };
+
+  if (editing) {
+    return (
+      <span className="fab-nick fab-nick-editing">
+        <input
+          className="fab-nick-input"
+          autoFocus
+          maxLength={12}
+          placeholder="你的暱稱"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+        />
+        <button type="button" className="fab-nick-btn" aria-label="儲存暱稱" onMouseDown={(e) => e.preventDefault()} onClick={save}>
+          <Check size={14} />
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button type="button" className={`fab-nick ${nick ? '' : 'fab-nick-empty'}`} onClick={start} aria-label="修改暱稱">
+      {nick || '取個暱稱'}
+      <Pencil size={12} />
+    </button>
+  );
+}
 /** 判定「貼底」的容許誤差（px）：捲動位置在底部這個範圍內才視為要跟著自動捲動 */
 const STICK_THRESHOLD = 40;
 /** GM 模式沒有 SSE（checkAuth 只認 x-room-password 標頭，EventSource 無法自訂標頭），改輪詢 */
@@ -46,6 +98,13 @@ export function ChatRoom(props: ChatRoomProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [nick, setNick] = useState(() => localStorage.getItem(NICK_KEY) ?? '');
   const [text, setText] = useState('');
+
+  // 暱稱在標題列的 NickChip 改（見 NickChip），這裡監聽廣播保持同步
+  useEffect(() => {
+    const sync = () => setNick(localStorage.getItem(NICK_KEY) ?? '');
+    window.addEventListener(NICK_EVENT, sync);
+    return () => window.removeEventListener(NICK_EVENT, sync);
+  }, []);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -118,10 +177,10 @@ export function ChatRoom(props: ChatRoomProps) {
       } else {
         const trimmedNick = nick.trim();
         if (trimmedNick.length < 1 || trimmedNick.length > 12) {
+          setErr('先點右上角取個暱稱');
           setSending(false);
           return;
         }
-        localStorage.setItem(NICK_KEY, trimmedNick);
         await api.sendChat(base!, token!, trimmedNick, trimmedText, scope);
       }
       setText('');
@@ -132,7 +191,7 @@ export function ChatRoom(props: ChatRoomProps) {
     }
   };
 
-  const canSend = !disabled && !sending && !!text.trim() && (gm || !!nick.trim());
+  const canSend = !disabled && !sending && !!text.trim();
 
   return (
     <div className="chat-room">
@@ -152,16 +211,6 @@ export function ChatRoom(props: ChatRoomProps) {
         ))}
       </div>
       <div className="chat-input-row">
-        {!gm && (
-          <input
-            className="text-input chat-nick-input"
-            placeholder="暱稱"
-            maxLength={12}
-            value={nick}
-            disabled={disabled}
-            onChange={(e) => setNick(e.target.value)}
-          />
-        )}
         <input
           className="text-input chat-text-input"
           placeholder={disabled ? '聊天室已停用' : gm ? `以 GM 身分發言到${scope === 'ghost' ? '陰間' : '陽間'}…` : '說點什麼…'}
@@ -173,8 +222,13 @@ export function ChatRoom(props: ChatRoomProps) {
             if (e.key === 'Enter') void send();
           }}
         />
-        <button className="btn btn-primary btn-sm" disabled={!canSend} onClick={() => void send()}>
-          送出
+        <button
+          className="btn btn-primary btn-sm chat-send-btn"
+          disabled={!canSend}
+          aria-label="送出"
+          onClick={() => void send()}
+        >
+          <SendHorizontal size={18} />
         </button>
       </div>
       <Toast message={err} onClose={() => setErr(null)} />

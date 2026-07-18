@@ -4,7 +4,7 @@ import { Ghost, MessageCircle } from 'lucide-react';
 import { api, type GhostData } from '../api';
 import { factionColor, roleShort } from '../ui/roleStyle';
 import { ChatFab } from '../components/ChatFab';
-import { ChatRoom } from '../components/ChatRoom';
+import { ChatRoom, NickChip } from '../components/ChatRoom';
 import { useChatUnread } from '../hooks/useChatUnread';
 import { WIN_STYLE, fmtTime, WatchVote } from './WatchPage';
 
@@ -256,6 +256,7 @@ export function GhostPage() {
         open={openChat === 'ghost'}
         onToggle={() => setOpenChat((v) => (v === 'ghost' ? null : 'ghost'))}
         slot={0}
+        headerExtra={<NickChip />}
       >
         <ChatRoom token={token} base="ghost" scope="ghost" live={live} disabled={!!error} />
       </ChatFab>
@@ -268,6 +269,7 @@ export function GhostPage() {
           open={openChat === 'watch'}
           onToggle={() => setOpenChat((v) => (v === 'watch' ? null : 'watch'))}
           slot={1}
+          headerExtra={<NickChip />}
         >
           <ChatRoom token={token} base="ghost" scope="watch" live={live} disabled={!!error} />
         </ChatFab>
