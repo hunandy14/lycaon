@@ -1,7 +1,7 @@
 import type { Ballot } from './types/events';
 import type { SeatId } from './types/rules';
 import type { RoleId } from './types/roles';
-import type { GameState } from './types/state';
+import type { DeathCause, GameState, SeerCheck } from './types/state';
 import type { Victory } from './victory';
 import type { GameReport, VoteCount } from './report';
 import { CAUSE_LABEL } from './day/deaths';
@@ -31,6 +31,10 @@ export interface ShareSettings {
   showDeathInfo: boolean;
   /** 報所有天數的戰況（預設關＝只報今天；夜晚仍拉夜幕、夜晚祕密照舊不下發） */
   showAllDays: boolean;
+  /** 陰間（死者視角）總開關 */
+  ghostEnabled: boolean;
+  /** 死者可開天眼看全底牌與全知時間軸（關閉時陰間連結降級為觀眾等級） */
+  ghostCanReveal: boolean;
 }
 
 export const DEFAULT_SHARE: ShareSettings = {
@@ -41,6 +45,8 @@ export const DEFAULT_SHARE: ShareSettings = {
   showChat: false,
   showDeathInfo: false,
   showAllDays: false,
+  ghostEnabled: false,
+  ghostCanReveal: false,
 };
 
 /** 觀戰畫面階段：準備 / 夜幕 / 今日戰況 / 終局 */
@@ -201,6 +207,131 @@ export function buildSpectatorView(state: GameState, settings: ShareSettings, re
       showChat: settings.showChat,
       showDeathInfo: settings.showDeathInfo,
       showAllDays: settings.showAllDays,
+      ghostEnabled: settings.ghostEnabled,
+      ghostCanReveal: settings.ghostCanReveal,
+    },
+  };
+}
+
+/**
+ * 陰間（死者視角）開眼後的全知畫面。GM 全知等級：全底牌、全天數投票與時間軸
+ * （含夜晚行動與查驗），僅過濾 `kind==='note'` 的 GM 筆記——死者本來就看得到 GM 結算，
+ * 但筆記是 GM 私人備忘，任何視角都不外流。夜晚不拉夜幕（stage 照實回 night，但照樣給盤面）。
+ * `ghostCanReveal===false` 時由 route 層改回 `buildSpectatorView`（本函式不做降級判斷）。
+ */
+export interface GhostPlayer {
+  seat: SeatId;
+  name?: string;
+  alive: boolean;
+  isSheriff: boolean;
+  idiotRevealed: boolean;
+  role: RoleId;
+  deathCause: string | null;
+  deathAt: string | null;
+  lover: boolean;
+  converted: boolean;
+}
+
+export interface GhostPendingDeath {
+  seat: SeatId;
+  cause: DeathCause;
+}
+
+export interface GhostView {
+  /** 全知視角旗標，供 client 區分 GhostView 與 SpectatorView */
+  god: true;
+  canReveal: boolean;
+  phaseText: string;
+  day: number;
+  stage: SpectatorStage;
+  ended: boolean;
+  winner: Victory | null;
+  aliveCount: number;
+  total: number;
+  sheriff: SeatId | null;
+  election: { candidates: SeatId[]; withdrawn: SeatId[] } | null;
+  players: GhostPlayer[];
+  /** 已結算、未公佈的夜晚死亡（首日競選時死者仍參與投票） */
+  pendingDeaths: GhostPendingDeath[];
+  /** 全部查驗結果（依夜序） */
+  seerChecks: SeerCheck[];
+  /** 全部天數的投票（不受 showAllDays/day 過濾） */
+  votes: SpectatorVote[];
+  /** 全部時間軸，含夜晚行動與查驗；僅過濾 GM 筆記 */
+  timeline: { seq: number; at: string; phase: string; text: string; secret: boolean }[];
+  settings: Omit<ShareSettings, 'enabled'>;
+}
+
+export function buildGhostView(state: GameState, settings: ShareSettings, report?: GameReport | null): GhostView {
+  const ended = state.phase.t === 'ended';
+  const stage: SpectatorStage = ended
+    ? 'ended'
+    : state.phase.t === 'night'
+      ? 'night'
+      : state.phase.t === 'setup'
+        ? 'setup'
+        : 'day';
+
+  const players: GhostPlayer[] = state.players.map((p) => ({
+    seat: p.seat,
+    name: p.name,
+    alive: p.alive,
+    isSheriff: state.sheriff === p.seat,
+    idiotRevealed: p.idiotRevealed,
+    role: p.role,
+    deathCause: p.death ? CAUSE_LABEL[p.death.cause] : null,
+    deathAt: p.death ? `第 ${p.death.day} ${p.death.during === 'night' ? '夜' : '天'}` : null,
+    lover: state.lovers?.includes(p.seat) ?? false,
+    converted: p.converted,
+  }));
+
+  const votes: SpectatorVote[] = report
+    ? report.days
+        .flatMap((d) => [...(d.sheriff?.rounds ?? []), ...d.exileRounds])
+        .sort((a, b) => a.seq - b.seq)
+        .map((r) => ({
+          kind: r.kind,
+          day: r.day,
+          round: r.round,
+          counts: r.counts,
+          ballots: r.ballots,
+          outcome: voteOutcome(r.kind, r.outcome),
+        }))
+    : [];
+
+  const timeline = state.log
+    .filter((e) => e.kind !== 'note') // GM 筆記永不外流，即使開眼
+    .map((e) => ({ seq: e.seq, at: e.at, phase: e.phase, text: e.text, secret: e.secret }));
+
+  const progress = gameProgress(state);
+  const electionOpen = state.election !== null && !state.election.done;
+
+  return {
+    god: true,
+    canReveal: true,
+    phaseText: progress.label,
+    day: state.day,
+    stage,
+    ended,
+    winner: state.winner,
+    aliveCount: progress.alive,
+    total: progress.total,
+    sheriff: state.sheriff,
+    election: electionOpen ? { candidates: activeCandidates(state), withdrawn: state.election!.withdrawn } : null,
+    players,
+    pendingDeaths: state.pendingDeaths.map((d) => ({ seat: d.seat, cause: d.cause })),
+    seerChecks: state.seerChecks,
+    votes,
+    timeline,
+    settings: {
+      showVotes: settings.showVotes,
+      showDeadRoles: settings.showDeadRoles,
+      showTimeline: settings.showTimeline,
+      showChat: settings.showChat,
+      showDeathInfo: settings.showDeathInfo,
+      showAllDays: settings.showAllDays,
+      ghostEnabled: settings.ghostEnabled,
+      ghostCanReveal: settings.ghostCanReveal,
     },
   };
 }

@@ -69,7 +69,7 @@ GM 面板加聊天監看視窗（雙分頁、可發言）。
 - [x] 1. **DB + store**：ghost_token 欄、chat 的 scope/is_gm 欄、ChatMessage 型別、
       store 方法（appendChat 簽名調整、listChat 分房、getGameByGhostToken、updateGhost）。
       既有呼叫點（watch.ts 聊天路由）同步改到編譯過。
-- [ ] 2. **engine**：ghostEnabled/ghostCanReveal 設定 + buildGhostView + 測試
+- [x] 2. **engine**：ghostEnabled/ghostCanReveal 設定 + buildGhostView + 測試
       （全知含夜晚行動與查驗、note 不外流、god 旗標、待公佈死亡照給、序列化含 role）。
 - [ ] 3. **ghost 路由**：routes/ghost.ts 三條 + index.ts 掛載 + share API 帶 ghost 資訊 +
       live 轉發分房（watch 只轉 watch、ghost 全轉）。
