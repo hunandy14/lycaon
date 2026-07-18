@@ -44,7 +44,7 @@ POST /api/games/:id/redo       → 需密碼
 DELETE /api/games/:id          → 需密碼
 GET  /api/games/:id/share      → { token, settings }（GM 端同樂設定；需密碼）
 POST /api/games/:id/share      → body Partial<ShareSettings>；首次開啟生成 token 後固定；需密碼
-GET  /api/watch/:token         → 觀戰過濾快照（?seat=N 死者解鎖上帝視角）；未開啟=404；不需密碼
+GET  /api/watch/:token         → 觀戰過濾快照（統一視角，無 seat 參數）；未開啟=404；不需密碼
 GET  /api/watch/:token/stream  → SSE（append/undo/redo/設定變更時推 update，25s 心跳）
 GET  /api/roster               → { names }（座位名字自動完成清單）
 GET  /api/stats                → { totalGames, players[] }（跨已結束局的玩家勝率/角色分佈聚合）
@@ -78,8 +78,11 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
 - ✅ **同樂模式**（觀戰端）：GM 於 GamePage「📡 同樂」開關並取得 `/watch/:token` 邀請連結。
   - **過濾一律在 server 端**（engine/src/watch.ts 的 `buildSpectatorView`，防從網路層扒底牌）；
     觀戰 token 與 game id 分離，觀戰者拿不到 GM API。
-  - ShareSettings 開關：`showVotes`/`showDeadRoles`/`showTimeline`/`godViewForDead`；翻牌白癡、
-    自爆狼、翻牌騎士屬「自曝身分」永遠公開；終局全攤牌；死者上帝視角=信任制自選座位。
+  - **統一視角**（無身份、人人同一份）：`buildSpectatorView` 依 `stage`（setup/night/day/ended）——
+    **夜晚拉夜幕**（server 對夜間祕密行動不推 SSE，連時機都藏住）、白天**只報今天**
+    （votes/timeline 過濾成當前 `state.day`，前一天自己記；盤面生死仍為當前狀態）、終局全攤牌。
+  - ShareSettings 開關：`showVotes`/`showDeadRoles`/`showTimeline`；翻牌白癡、自爆狼、翻牌騎士、
+    亮牌開槍屬「自曝身分」永遠公開；夜間死因永不下發（白天死因公開）。
   - SSE：server/src/live.ts 單進程訂閱中樞（PM2 fork 單實例前提）；client EventSource + 30s 保底輪詢。
 - ✅ **房主管理密碼**（`feat/room-auth-stats`）：建局設 4 位數密碼，CF 之外的第二道鎖（見 API 段與部署段）。
 - ✅ **玩家名冊與戰績**：建局座位名字進 `roster` 表（自動完成、未來 Google 綁定錨點）；`/stats` 頁跨已結束局
