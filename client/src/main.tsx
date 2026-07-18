@@ -9,6 +9,7 @@ import { GamePage } from './pages/GamePage';
 import { TimelinePage } from './pages/TimelinePage';
 import { ReportPage } from './pages/ReportPage';
 import { WatchPage } from './pages/WatchPage';
+import { StatsPage } from './pages/StatsPage';
 
 const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
   { path: '/game/:id/timeline', element: <TimelinePage /> },
   { path: '/game/:id/report', element: <ReportPage /> },
   { path: '/watch/:token', element: <WatchPage /> },
+  { path: '/stats', element: <StatsPage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

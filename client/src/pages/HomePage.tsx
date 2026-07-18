@@ -57,6 +57,9 @@ export function HomePage() {
       <button className="btn btn-primary btn-lg btn-block" onClick={() => nav('/new')}>
         ＋ 開新的一局
       </button>
+      <Link to="/stats" className="btn btn-ghost btn-block faint" style={{ marginTop: 8 }}>
+        📊 玩家戰績
+      </Link>
 
       {active.length > 0 && (
         <section style={{ marginTop: 24 }}>

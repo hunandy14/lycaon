@@ -1,8 +1,18 @@
-import type { EventEnvelope, GameConfig, GameEvent, GameProgress, ShareSettings, SpectatorView } from '@lycaon/engine';
+import type { EventEnvelope, GameConfig, GameEvent, GameProgress, RoleId, ShareSettings, SpectatorView } from '@lycaon/engine';
 
 export interface ShareInfo {
   token: string | null;
   settings: ShareSettings;
+}
+
+export interface PlayerStat {
+  name: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  byRole: Partial<Record<RoleId, number>>;
+  asGood: { games: number; wins: number };
+  asWolf: { games: number; wins: number };
 }
 
 export type WatchData = SpectatorView & { title: string };
@@ -99,4 +109,8 @@ export const api = {
 
   getWatch: (token: string, seat?: number | null) =>
     req<WatchData>(`/watch/${token}${seat ? `?seat=${seat}` : ''}`),
+
+  getRoster: () => req<{ names: string[] }>('/roster').then((r) => r.names),
+
+  getStats: () => req<{ totalGames: number; players: PlayerStat[] }>('/stats'),
 };

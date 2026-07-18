@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ALL_ROLES,
@@ -42,8 +42,14 @@ export function NewGamePage() {
   const [rules, setRules] = useState<RuleConfig>({ ...DEFAULT_RULES });
   const [title, setTitle] = useState('');
   const [password, setPassword] = useState(genPassword);
+  const [rosterNames, setRosterNames] = useState<string[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 名冊：座位輸入名字時自動完成（常玩的朋友一次就記住）
+  useEffect(() => {
+    api.getRoster().then(setRosterNames).catch(() => {});
+  }, []);
 
   const playerCount = useMemo(() => Object.values(pool).reduce((a, b) => a + (b ?? 0), 0), [pool]);
   const errors = useMemo(
@@ -109,6 +115,9 @@ export function NewGamePage() {
 
   return (
     <div className="app">
+      <datalist id="roster-names">
+        {rosterNames.map((n) => <option key={n} value={n} />)}
+      </datalist>
       <WizardHeader step={step} onBack={goBack} />
 
       {step === 'board' && (
@@ -186,6 +195,7 @@ export function NewGamePage() {
                 </select>
                 <input
                   placeholder="名字(選填)"
+                  list="roster-names"
                   value={s.name ?? ''}
                   style={{ width: 96, padding: 10, borderRadius: 8, background: 'var(--bg-elev2)', color: 'var(--text)', border: '1px solid var(--border)' }}
                   onChange={(e) => setSeatName(s.seat, e.target.value)}
