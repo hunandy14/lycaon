@@ -11,6 +11,9 @@ import { activeCandidates } from './day/sheriff';
 /**
  * 同樂模式（觀戰端）的視角過濾。server 以此產出對外 payload——
  * 過濾一律在 server 端做，觀戰者從網路層拿不到未公開的情報。
+ *
+ * 統一視角（無身份、人人同一份）：夜晚拉夜幕什麼都不報，白天只報「今天」的戰況
+ * （前幾天的投票與事件流不再顯示，玩家自己記），終局才全攤牌。
  */
 
 export interface ShareSettings {
@@ -22,8 +25,6 @@ export interface ShareSettings {
   showDeadRoles: boolean;
   /** 公開時間軸（GM 口播等級的公開事件） */
   showTimeline: boolean;
-  /** 死者可看上帝視角 */
-  godViewForDead: boolean;
 }
 
 export const DEFAULT_SHARE: ShareSettings = {
@@ -31,9 +32,10 @@ export const DEFAULT_SHARE: ShareSettings = {
   showVotes: true,
   showDeadRoles: false,
   showTimeline: true,
-  // 信任制（觀戰者自選座位）無法阻止活玩家假冒死者，預設關、由房主在熟人局自行開
-  godViewForDead: false,
 };
+
+/** 觀戰畫面階段：準備 / 夜幕 / 今日戰況 / 終局 */
+export type SpectatorStage = 'setup' | 'night' | 'day' | 'ended';
 
 export interface SpectatorPlayer {
   seat: SeatId;
@@ -43,11 +45,11 @@ export interface SpectatorPlayer {
   idiotRevealed: boolean;
   /** null = 身分未公開 */
   role: RoleId | null;
-  /** 繁中死因；僅在身分公開時給 */
+  /** 繁中死因；僅白天死亡（公開事件）或終局才給 */
   deathCause: string | null;
   /** 死亡時間（「第 2 夜」）；死亡是公開事實，一律給 */
   deathAt: string | null;
-  /** 僅上帝視角/終局為真實值，其餘一律 false */
+  /** 僅終局為真實值，其餘一律 false */
   lover: boolean;
   converted: boolean;
 }
@@ -64,17 +66,17 @@ export interface SpectatorVote {
 export interface SpectatorView {
   phaseText: string;
   day: number;
-  isNight: boolean;
+  stage: SpectatorStage;
   ended: boolean;
-  /** 本回應是否為上帝視角 */
-  god: boolean;
   winner: Victory | null;
   aliveCount: number;
   total: number;
   sheriff: SeatId | null;
   election: { candidates: SeatId[]; withdrawn: SeatId[] } | null;
   players: SpectatorPlayer[];
+  /** 只含「今天」的投票（終局為全部）；showVotes 關 = null */
   votes: SpectatorVote[] | null;
+  /** 只含「今天」的公開事件（終局為全部）；showTimeline 關 = null */
   timeline: { seq: number; phase: string; text: string; secret: boolean }[] | null;
   settings: Omit<ShareSettings, 'enabled'>;
 }
@@ -95,20 +97,23 @@ function voteOutcome(v: SpectatorVote['kind'], o: GameReport['days'][number]['ex
 }
 
 /**
- * 產出觀戰視角。
- * - 身分公開條件：終局 / 上帝視角 / 翻牌白癡 / 自爆狼 / 翻牌騎士 /（死亡且 showDeadRoles）
- * - 夜晚暫存、待公佈死亡、查驗結果一律不出現在結構中（上帝視角經由完整時間軸呈現）
+ * 產出觀戰視角（統一視角，無 viewerSeat）。
+ * - 身分公開條件：終局 / 翻牌白癡 / 自爆狼 / 翻牌騎士 / 亮牌開槍 /（死亡且 showDeadRoles）
+ * - 夜晚暫存、待公佈死亡、查驗結果一律不出現在結構中
+ * - 「只報今天」：投票與事件流過濾成當前 state.day（終局不過濾、全公開）
  */
-export function buildSpectatorView(
-  state: GameState,
-  settings: ShareSettings,
-  viewerSeat: SeatId | null,
-  report?: GameReport | null,
-): SpectatorView {
+export function buildSpectatorView(state: GameState, settings: ShareSettings, report?: GameReport | null): SpectatorView {
   const ended = state.phase.t === 'ended';
-  const viewer = viewerSeat === null ? null : state.players.find((p) => p.seat === viewerSeat) ?? null;
-  const god = settings.godViewForDead && viewer !== null && !viewer.alive;
-  const revealAll = ended || god;
+  const stage: SpectatorStage = ended
+    ? 'ended'
+    : state.phase.t === 'night'
+      ? 'night'
+      : state.phase.t === 'setup'
+        ? 'setup'
+        : 'day';
+  const revealAll = ended;
+  const today = state.day;
+  const showToday = (d: number): boolean => revealAll || d === today; // 只報今天；終局全公開
 
   const players: SpectatorPlayer[] = state.players.map((p) => {
     // 自曝身分：翻牌白癡、自爆狼、翻牌騎士、亮牌開槍的獵人/黑狼王（線下都是當眾翻牌）
@@ -138,6 +143,7 @@ export function buildSpectatorView(
     (settings.showVotes || revealAll) && report
       ? report.days
           .flatMap((d) => [...(d.sheriff?.rounds ?? []), ...d.exileRounds])
+          .filter((r) => showToday(r.day))
           .sort((a, b) => a.seq - b.seq)
           .map((r) => ({
             kind: r.kind,
@@ -152,9 +158,10 @@ export function buildSpectatorView(
   const timeline =
     settings.showTimeline || revealAll
       ? state.log
-          .filter((e) => e.kind !== 'note') // GM 筆記任何視角（含上帝/終局）都不外流
+          .filter((e) => e.kind !== 'note') // GM 筆記任何視角（含終局）都不外流
           .filter((e) => (revealAll ? true : !e.secret))
           .filter((e) => (e.kind === 'ballots' ? settings.showVotes || revealAll : true))
+          .filter((e) => showToday(e.day)) // 只報今天
           .map((e) => ({ seq: e.seq, phase: e.phase, text: e.text, secret: e.secret }))
       : null;
 
@@ -164,16 +171,13 @@ export function buildSpectatorView(
   return {
     phaseText: progress.label,
     day: state.day,
-    isNight: state.phase.t === 'night',
+    stage,
     ended,
-    god,
     winner: state.winner,
     aliveCount: progress.alive,
     total: progress.total,
     sheriff: state.sheriff,
-    election: electionOpen
-      ? { candidates: activeCandidates(state), withdrawn: state.election!.withdrawn }
-      : null,
+    election: electionOpen ? { candidates: activeCandidates(state), withdrawn: state.election!.withdrawn } : null,
     players,
     votes,
     timeline,
@@ -181,7 +185,6 @@ export function buildSpectatorView(
       showVotes: settings.showVotes,
       showDeadRoles: settings.showDeadRoles,
       showTimeline: settings.showTimeline,
-      godViewForDead: settings.godViewForDead,
     },
   };
 }
