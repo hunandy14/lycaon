@@ -1065,3 +1065,126 @@
   background: linear-gradient(180deg, #0b0d15, var(--bg-card));
   border-color: #2a2f45;
 }
+
+/* ---------- 聊天浮動球（FAB） ---------- */
+.fab-ball {
+  position: fixed;
+  right: 14px;
+  bottom: calc(18px + var(--fab-slot, 0) * 64px + var(--safe-b));
+  z-index: 55;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.fab-ball:active {
+  transform: scale(0.94);
+}
+.fab-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid var(--bg);
+}
+.fab-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 58;
+  height: 68vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  animation: fabPanelUpMobile 0.2s ease;
+  padding-bottom: var(--safe-b);
+  overflow: hidden;
+}
+@keyframes fabPanelUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+@media (min-width: 480px) {
+  .fab-panel {
+    left: auto;
+    right: 14px;
+    bottom: calc(18px + var(--fab-slot, 0) * 64px + 60px);
+    width: 360px;
+    height: 480px;
+    border-radius: 16px;
+    border-bottom: 1px solid var(--border);
+    animation: fabPanelUpDesktop 0.15s ease;
+  }
+  @keyframes fabPanelUpDesktop {
+    from {
+      transform: translateY(12px);
+      opacity: 0;
+    }
+  }
+}
+.fab-panel-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.fab-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.fab-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+}
+.fab-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px calc(10px + var(--safe-b));
+}
+.fab-panel-body .chat-room {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.fab-panel-body .chat-list {
+  flex: 1 1 auto;
+  max-height: none;
+}
+.chat-room-live {
+  align-self: flex-end;
+  margin-bottom: 4px;
+}
