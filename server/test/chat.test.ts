@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import { openDb, EventStore } from '../src/db';
-import { watchRoutes } from '../src/routes/watch';
+import { parseShare, watchRoutes } from '../src/routes/watch';
+import type { GameRow } from '../src/db';
 import { DEFAULT_RULES, DEFAULT_SHARE, type GameConfig } from '@lycaon/engine';
 
 const config: GameConfig = {
@@ -25,6 +26,13 @@ function setup(shareOverrides: Partial<typeof DEFAULT_SHARE> = { enabled: true, 
   app.route('/api/watch', watchRoutes(store));
   return { store, app, token };
 }
+
+describe('parseShare', () => {
+  it('showDeadRoles 一律覆蓋 false（UI 已移除開關，舊局存 true 不得再亮死者牌）', () => {
+    const row = { share_json: JSON.stringify({ ...DEFAULT_SHARE, enabled: true, showDeadRoles: true }) } as GameRow;
+    expect(parseShare(row).showDeadRoles).toBe(false);
+  });
+});
 
 describe('觀戰聊天室', () => {
   afterEach(() => {

@@ -9,7 +9,9 @@ import { clientIp, rateLimited } from './chatUtil';
 export function parseShare(row: GameRow): ShareSettings {
   if (!row.share_json) return { ...DEFAULT_SHARE };
   try {
-    return { ...DEFAULT_SHARE, ...(JSON.parse(row.share_json) as Partial<ShareSettings>) };
+    // showDeadRoles 硬性覆蓋 false：UI 已移除此開關（固定暗牌到終局），
+    // 但移除前的舊局可能存著 true，不覆蓋會讓觀戰頁提前亮死者牌
+    return { ...DEFAULT_SHARE, ...(JSON.parse(row.share_json) as Partial<ShareSettings>), showDeadRoles: false };
   } catch {
     return { ...DEFAULT_SHARE };
   }
