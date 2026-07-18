@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import type { ShareSettings } from '@lycaon/engine';
 import { api, type ShareInfo } from '../api';
 
@@ -7,6 +8,8 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
   const [info, setInfo] = useState<ShareInfo | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [qr, setQr] = useState<string | null>(null);
 
   useEffect(() => {
     api.getShare(id).then(setInfo).catch((e) => setErr((e as Error).message));
@@ -24,6 +27,13 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
 
   const s = info?.settings;
   const url = info?.token && s?.enabled ? `${location.origin}/watch/${info.token}` : null;
+
+  // QR 純前端生成（掃了直接進觀戰頁）
+  useEffect(() => {
+    if (url && showQr) {
+      QRCode.toDataURL(url, { width: 440, margin: 1 }).then(setQr).catch(() => setQr(null));
+    }
+  }, [url, showQr]);
 
   const copy = async () => {
     if (!url) return;
@@ -50,10 +60,17 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
 
             {url && (
               <div className="card" style={{ padding: 10, marginBottom: 8 }}>
-                <div className="small faint" style={{ wordBreak: 'break-all' }}>{url}</div>
-                <button className="btn btn-primary btn-sm btn-block" style={{ marginTop: 8 }} onClick={copy}>
-                  {copied ? '✅ 已複製' : '📋 複製邀請連結'}
-                </button>
+                <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                  <div className="small faint grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</div>
+                  <button className="btn btn-sm" onClick={copy} aria-label="複製邀請連結">{copied ? '✅' : '📋'}</button>
+                  <button className={`btn btn-sm ${showQr ? 'btn-primary' : ''}`} onClick={() => setShowQr((v) => !v)} aria-label="顯示 QR Code">🔳</button>
+                </div>
+                {showQr && qr && (
+                  <div className="center" style={{ marginTop: 10 }}>
+                    <img src={qr} alt="觀戰連結 QR Code" style={{ width: 220, height: 220, borderRadius: 10, background: '#fff', padding: 8 }} />
+                    <div className="faint small" style={{ marginTop: 6 }}>掃碼直接進觀戰頁</div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -64,7 +81,7 @@ export function ShareSheet({ id, onClose }: { id: string; onClose: () => void })
                 </p>
                 <Row label="投票明細" hint="每輪票型與棄票（桌上舉手本來就公開；關閉後票型不顯示）" value={s!.showVotes} onChange={(v) => patch({ showVotes: v })} />
                 <Row label="公開時間軸" hint="GM 口播等級的事件流（夜晚行動、死因、查驗一律不含）" value={s!.showTimeline} onChange={(v) => patch({ showTimeline: v })} />
-                <Row label="聊天室" hint="觀戰頁的聊天區；關閉後不顯示也不能發言" value={s!.showChat} onChange={(v) => patch({ showChat: v })} />
+                <Row label="陽間聊天室" hint="觀戰頁的公開聊天區（人人可見可發言）；關閉後不顯示也不能發言" value={s!.showChat} onChange={(v) => patch({ showChat: v })} />
               </>
             )}
             {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
