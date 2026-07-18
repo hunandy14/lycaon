@@ -177,7 +177,7 @@ export function gamesRoutes(store: EventStore): Hono {
     if (!game) return c.json({ error: '對局不存在' }, 404);
     const denied = checkAuth(game, c, true);
     if (denied) return denied;
-    return c.json({ token: game.share_token, settings: parseShare(game) });
+    return c.json({ token: game.share_token, ghostToken: game.ghost_token, settings: parseShare(game) });
   });
 
   app.post('/:id/share', async (c) => {
@@ -187,11 +187,13 @@ export function gamesRoutes(store: EventStore): Hono {
     if (denied) return denied;
     const patch = (await c.req.json().catch(() => ({}))) as Partial<ShareSettings>;
     const settings: ShareSettings = { ...DEFAULT_SHARE, ...parseShare(game), ...patch };
-    // token 首次開啟時生成，之後固定（開關不換連結）
+    // token 首次開啟時生成，之後固定（開關不換連結）；ghost token 比照 share token 的做法
     const token = game.share_token ?? (settings.enabled ? nanoid(12) : null);
+    const ghostToken = game.ghost_token ?? (settings.ghostEnabled ? nanoid(12) : null);
     store.updateShare(game.id, token, JSON.stringify(settings));
+    if (ghostToken && ghostToken !== game.ghost_token) store.updateGhost(game.id, ghostToken);
     notify(game.id);
-    return c.json({ token, settings });
+    return c.json({ token, ghostToken, settings });
   });
 
   return app;
