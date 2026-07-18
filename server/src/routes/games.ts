@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import type { Context } from 'hono';
 import { nanoid } from 'nanoid';
 import type { GameConfig, GameEvent, GameProgress, ShareSettings } from '@lycaon/engine';
 import { replay, validate, validateConfig, gameProgress, BOARD_PRESETS, DEFAULT_SHARE } from '@lycaon/engine';
-import type { EventStore, GameRow } from '../db';
+import type { ChatScope, EventStore, GameRow } from '../db';
 import { hashPassword, verifyPassword } from '../auth';
-import { notify } from '../live';
+import { notify, notifyChat, subscribe } from '../live';
 import { parseShare } from './watch';
 
 /**
@@ -194,6 +195,69 @@ export function gamesRoutes(store: EventStore): Hono {
     if (ghostToken && ghostToken !== game.ghost_token) store.updateGhost(game.id, ghostToken);
     notify(game.id);
     return c.json({ token, ghostToken, settings });
+  });
+
+  // ── GM 聊天監看（一律過房主密碼；GM 發言免 rate limit、nick 固定 'GM'、isGm=1） ──
+  app.get('/:id/chat', (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
+    return c.json({
+      watch: store.listChat(game.id, 'watch', 50),
+      ghost: store.listChat(game.id, 'ghost', 50),
+    });
+  });
+
+  app.post('/:id/chat', async (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
+
+    let body: { scope?: unknown; text?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: '格式錯誤' }, 400);
+    }
+    const scope: ChatScope = body.scope === 'watch' ? 'watch' : 'ghost';
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (text.length < 1 || text.length > 200) return c.json({ error: '訊息長度需為 1–200 字' }, 400);
+
+    // GM 端免 rate limit（房主已過密碼驗證，不是匿名觀眾）
+    const message = store.appendChat(game.id, 'GM', text, new Date().toISOString(), scope, true);
+    notifyChat(game.id, message);
+    return c.json(message, 201);
+  });
+
+  app.get('/:id/chat/stream', (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
+    const gameId = game.id;
+
+    return streamSSE(c, async (stream) => {
+      let alive = true;
+      const unsub = subscribe(gameId, (event) => {
+        if (event.kind === 'update') {
+          void stream.writeSSE({ event: 'update', data: String(Date.now()) });
+        } else if (event.kind === 'chat') {
+          // GM 端兩房都要看：陰間＋陽間
+          void stream.writeSSE({ event: 'chat', data: JSON.stringify(event.message) });
+        }
+      });
+      stream.onAbort(() => {
+        alive = false;
+        unsub();
+      });
+      await stream.writeSSE({ event: 'hello', data: 'ok' });
+      while (alive) {
+        await stream.sleep(25000);
+        if (alive) await stream.writeSSE({ event: 'ping', data: '' });
+      }
+    });
   });
 
   return app;
