@@ -20,6 +20,15 @@ export interface GameRow {
   updated_at: string;
 }
 
+/** 觀戰頁聊天訊息（獨立於 events，不進 reducer/undo） */
+export interface ChatMessage {
+  id: number;
+  gameId: string;
+  nick: string;
+  text: string;
+  createdAt: string;
+}
+
 export function openDb(path: string): Database.Database {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
@@ -47,6 +56,14 @@ export function openDb(path: string): Database.Database {
       name        TEXT PRIMARY KEY,
       created_at  TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS chat (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id    TEXT NOT NULL,
+      nick       TEXT NOT NULL,
+      text       TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_game ON chat (game_id, id);
   `);
   const cols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
   const addCol = (name: string) => {
@@ -168,5 +185,25 @@ export class EventStore {
 
   listRoster(): string[] {
     return (this.db.prepare(`SELECT name FROM roster ORDER BY name`).all() as { name: string }[]).map((r) => r.name);
+  }
+
+  /** 寫入一則聊天訊息，回傳完整 ChatMessage */
+  appendChat(gameId: string, nick: string, text: string, now: string): ChatMessage {
+    const info = this.db
+      .prepare(`INSERT INTO chat (game_id, nick, text, created_at) VALUES (?, ?, ?, ?)`)
+      .run(gameId, nick, text, now);
+    return { id: Number(info.lastInsertRowid), gameId, nick, text, createdAt: now };
+  }
+
+  /** 最近 N 則聊天訊息（依 id 升冪） */
+  listChat(gameId: string, limit = 50): ChatMessage[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, game_id, nick, text, created_at FROM chat WHERE game_id = ? ORDER BY id DESC LIMIT ?`
+      )
+      .all(gameId, limit) as { id: number; game_id: string; nick: string; text: string; created_at: string }[];
+    return rows
+      .reverse()
+      .map((r) => ({ id: r.id, gameId: r.game_id, nick: r.nick, text: r.text, createdAt: r.created_at }));
   }
 }
