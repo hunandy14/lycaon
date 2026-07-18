@@ -65,7 +65,7 @@ export function HomePage() {
             <Link key={g.id} to={`/game/${g.id}`} className="card" style={{ display: 'block', marginBottom: 10, textDecoration: 'none', color: 'inherit', borderColor: 'var(--accent-dim)' }}>
               <div className="row" style={{ alignItems: 'center' }}>
                 <div className="grow">
-                  <div style={{ fontWeight: 700 }}>{g.title}</div>
+                  <div style={{ fontWeight: 700 }}>{g.locked && '🔒 '}{g.title}</div>
                   <div className="faint small">{progressText(g)} · {fmtDate(g.updatedAt)}</div>
                 </div>
                 <span className="btn btn-primary btn-sm">繼續主持 →</span>

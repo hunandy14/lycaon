@@ -14,6 +14,7 @@ export interface GameSummary {
   playerCount: number;
   presetId: string;
   progress: GameProgress | null;
+  locked: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,26 +25,41 @@ export interface GameLoad {
   status: GameSummary['status'];
   envelopes: EventEnvelope[];
   redoCount: number;
+  locked: boolean;
 }
+
+/** 房主管理密碼：存本機（建局裝置自動記住；換裝置才需重打） */
+const passKey = (id: string) => `lycaon:pass:${id}`;
+export const roomPass = {
+  get: (id: string): string | null => localStorage.getItem(passKey(id)),
+  set: (id: string, pw: string) => localStorage.setItem(passKey(id), pw),
+  clear: (id: string) => localStorage.removeItem(passKey(id)),
+};
 
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly headSeq?: number,
+    /** server 要求房主密碼（401）：UI 據此彈解鎖框 */
+    readonly needPassword?: boolean,
   ) {
     super(message);
   }
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+async function req<T>(path: string, init?: RequestInit, pw?: string | null): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    headers: { 'content-type': 'application/json' },
     ...init,
+    headers: {
+      'content-type': 'application/json',
+      ...(pw ? { 'x-room-password': pw } : {}),
+      ...init?.headers,
+    },
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(body.error ?? `請求失敗（${res.status}）`, res.status, body.headSeq);
+    throw new ApiError(body.error ?? `請求失敗（${res.status}）`, res.status, body.headSeq, body.needPassword);
   }
   return body as T;
 }
@@ -51,32 +67,35 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   listGames: () => req<{ games: GameSummary[] }>('/games').then((r) => r.games),
 
-  createGame: (config: GameConfig) =>
-    req<{ id: string }>('/games', { method: 'POST', body: JSON.stringify(config) }).then((r) => r.id),
+  /** 建局；password 非空 = 設房主管理密碼（經標頭帶入，caller 自行 roomPass.set） */
+  createGame: (config: GameConfig, password?: string) =>
+    req<{ id: string }>('/games', { method: 'POST', body: JSON.stringify(config) }, password || null).then((r) => r.id),
 
-  loadGame: (id: string) => req<GameLoad>(`/games/${id}`),
+  loadGame: (id: string) => req<GameLoad>(`/games/${id}`, undefined, roomPass.get(id)),
 
-  deleteGame: (id: string) => req<{ ok: true }>(`/games/${id}`, { method: 'DELETE' }),
+  deleteGame: (id: string) => req<{ ok: true }>(`/games/${id}`, { method: 'DELETE' }, roomPass.get(id)),
 
   appendEvent: (id: string, event: GameEvent, expectedSeq: number) =>
-    req<{ seq: number; envelope: EventEnvelope }>(`/games/${id}/events`, {
-      method: 'POST',
-      body: JSON.stringify({ event, expectedSeq }),
-    }),
+    req<{ seq: number; envelope: EventEnvelope }>(
+      `/games/${id}/events`,
+      { method: 'POST', body: JSON.stringify({ event, expectedSeq }) },
+      roomPass.get(id),
+    ),
 
   undo: (id: string, toSeq?: number) =>
-    req<{ headSeq: number; redoCount: number }>(`/games/${id}/undo`, {
-      method: 'POST',
-      body: JSON.stringify({ toSeq }),
-    }),
+    req<{ headSeq: number; redoCount: number }>(
+      `/games/${id}/undo`,
+      { method: 'POST', body: JSON.stringify({ toSeq }) },
+      roomPass.get(id),
+    ),
 
   redo: (id: string) =>
-    req<{ headSeq: number; redoCount: number }>(`/games/${id}/redo`, { method: 'POST', body: '{}' }),
+    req<{ headSeq: number; redoCount: number }>(`/games/${id}/redo`, { method: 'POST', body: '{}' }, roomPass.get(id)),
 
-  getShare: (id: string) => req<ShareInfo>(`/games/${id}/share`),
+  getShare: (id: string) => req<ShareInfo>(`/games/${id}/share`, undefined, roomPass.get(id)),
 
   updateShare: (id: string, patch: Partial<ShareSettings>) =>
-    req<ShareInfo>(`/games/${id}/share`, { method: 'POST', body: JSON.stringify(patch) }),
+    req<ShareInfo>(`/games/${id}/share`, { method: 'POST', body: JSON.stringify(patch) }, roomPass.get(id)),
 
   getWatch: (token: string, seat?: number | null) =>
     req<WatchData>(`/watch/${token}${seat ? `?seat=${seat}` : ''}`),

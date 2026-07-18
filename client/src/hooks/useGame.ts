@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventEnvelope, GameEvent, GameState } from '@lycaon/engine';
-import { replay, reduce, validate } from '@lycaon/engine';
-import { api, ApiError } from '../api';
+import { replay, validate } from '@lycaon/engine';
+import { api, ApiError, roomPass } from '../api';
 
 export interface UseGame {
   state: GameState | null;
@@ -10,7 +10,11 @@ export interface UseGame {
   loading: boolean;
   busy: boolean;
   error: string | null;
+  /** server 要求房主密碼（換裝置或密碼錯）：GamePage 據此顯示解鎖框 */
+  needPassword: boolean;
   clearError: () => void;
+  /** 存密碼並重試載入；回傳是否解鎖成功 */
+  unlock: (pw: string) => Promise<boolean>;
   /** 送出事件；本地先驗證，失敗回傳錯誤訊息、不改動 state */
   dispatch: (event: GameEvent) => Promise<boolean>;
   undo: (toSeq?: number) => Promise<void>;
@@ -24,7 +28,14 @@ export function useGame(id: string): UseGame {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needPassword, setNeedPassword] = useState(false);
   const inflight = useRef(false);
+
+  /** 把 API 錯誤導向對應 UI：401 needPassword → 解鎖框；其餘 → 錯誤訊息 */
+  const handleErr = useCallback((e: unknown, fallback: string): void => {
+    if (e instanceof ApiError && e.needPassword) setNeedPassword(true);
+    else setError(e instanceof Error ? e.message : fallback);
+  }, []);
 
   const state = useMemo<GameState | null>(() => {
     if (envelopes.length === 0) return null;
@@ -46,6 +57,7 @@ export function useGame(id: string): UseGame {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setNeedPassword(false);
     api
       .loadGame(id)
       .then((g) => {
@@ -53,12 +65,34 @@ export function useGame(id: string): UseGame {
         setEnvelopes(g.envelopes);
         setRedoCount(g.redoCount);
       })
-      .catch((e) => active && setError(e.message))
+      .catch((e) => active && handleErr(e, '載入失敗'))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, handleErr]);
+
+  const unlock = useCallback(
+    async (pw: string): Promise<boolean> => {
+      roomPass.set(id, pw);
+      setBusy(true);
+      try {
+        const g = await api.loadGame(id);
+        setEnvelopes(g.envelopes);
+        setRedoCount(g.redoCount);
+        setNeedPassword(false);
+        setError(null);
+        return true;
+      } catch (e) {
+        roomPass.clear(id);
+        setError(e instanceof ApiError && e.needPassword ? '密碼錯誤' : '解鎖失敗');
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [id],
+  );
 
   const dispatch = useCallback(
     async (event: GameEvent): Promise<boolean> => {
@@ -87,7 +121,7 @@ export function useGame(id: string): UseGame {
           setError('狀態已被其他裝置變更，已重新載入');
           await refresh().catch(() => {});
         } else {
-          setError(e instanceof Error ? e.message : '送出失敗');
+          handleErr(e, '送出失敗');
         }
         return false;
       } finally {
@@ -108,7 +142,7 @@ export function useGame(id: string): UseGame {
         await api.undo(id, toSeq);
         await refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : '撤銷失敗');
+        handleErr(e, '撤銷失敗');
       } finally {
         inflight.current = false;
         setBusy(false);
@@ -126,12 +160,12 @@ export function useGame(id: string): UseGame {
       await api.redo(id);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '重做失敗');
+      handleErr(e, '重做失敗');
     } finally {
       inflight.current = false;
       setBusy(false);
     }
-  }, [id, refresh]);
+  }, [id, refresh, handleErr]);
 
   return {
     state,
@@ -140,7 +174,9 @@ export function useGame(id: string): UseGame {
     loading,
     busy,
     error,
+    needPassword,
     clearError: () => setError(null),
+    unlock,
     dispatch,
     undo,
     redo,

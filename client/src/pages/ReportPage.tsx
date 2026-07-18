@@ -17,6 +17,7 @@ import { useGame } from '../hooks/useGame';
 import { roleShort } from '../ui/roleStyle';
 import { factionColor } from '../ui/roleStyle';
 import { Toast } from '../components/Toast';
+import { UnlockGate } from '../components/UnlockGate';
 
 const WIN_STYLE = {
   good: { emoji: '✋', title: '好人陣營勝利', color: 'var(--good)' },
@@ -79,6 +80,7 @@ export function ReportPage() {
   const beats = useMemo(() => (report ? buildBeats(report) : []), [report]);
 
   if (g.loading) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>載入中…</p></div>;
+  if (g.needPassword) return <UnlockGate busy={g.busy} error={g.error} onUnlock={g.unlock} />;
   if (!report) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>找不到對局</p></div>;
 
   return (

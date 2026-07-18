@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../hooks/useGame';
 import { Toast } from '../components/Toast';
+import { UnlockGate } from '../components/UnlockGate';
 import type { TimelineEntry } from '@lycaon/engine';
 
 export function TimelinePage() {
@@ -9,6 +10,7 @@ export function TimelinePage() {
   const nav = useNavigate();
 
   if (g.loading) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>載入中…</p></div>;
+  if (g.needPassword) return <UnlockGate busy={g.busy} error={g.error} onUnlock={g.unlock} />;
   if (!g.state) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>找不到對局</p></div>;
 
   const log = g.state.log;

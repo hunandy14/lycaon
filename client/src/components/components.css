@@ -962,3 +962,25 @@
   padding: 8px 10px;
   font-size: 0.9rem;
 }
+
+/* ---------- 通用文字輸入 ---------- */
+.text-input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-elev2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 1rem;
+}
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---------- 解鎖畫面 ---------- */
+.unlock-card {
+  margin-top: 56px;
+  text-align: center;
+  padding: 28px 20px;
+}

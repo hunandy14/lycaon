@@ -12,9 +12,12 @@ import {
   type RuleConfig,
   type SeatConfig,
 } from '@lycaon/engine';
-import { api } from '../api';
+import { api, roomPass } from '../api';
 import { Toast } from '../components/Toast';
 import { factionColor } from '../ui/roleStyle';
+
+/** 預設隨手產一組 4 位數管理密碼（好口述、好輸入；本機自動記住） */
+const genPassword = () => String(Math.floor(1000 + Math.random() * 9000));
 
 type Step = 'board' | 'pool' | 'rules' | 'seats' | 'confirm';
 const STEPS: Step[] = ['board', 'pool', 'rules', 'seats', 'confirm'];
@@ -38,6 +41,7 @@ export function NewGamePage() {
   const [seats, setSeats] = useState<SeatConfig[]>([]);
   const [rules, setRules] = useState<RuleConfig>({ ...DEFAULT_RULES });
   const [title, setTitle] = useState('');
+  const [password, setPassword] = useState(genPassword);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -94,7 +98,8 @@ export function NewGamePage() {
     setBusy(true);
     try {
       const config: GameConfig = { playerCount, seats, rules, presetId, title: title || undefined };
-      const id = await api.createGame(config);
+      const id = await api.createGame(config, password);
+      if (password) roomPass.set(id, password); // 本機記住，主持全程免再輸入
       nav(`/game/${id}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : '建立失敗');
@@ -226,6 +231,23 @@ export function NewGamePage() {
             <div className="divider" />
             <RuleSummary rules={rules} />
           </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>🔒 管理密碼</div>
+            <div className="faint small" style={{ marginBottom: 8 }}>
+              防止路人亂點你的對局。本機會自動記住，主持全程免再輸入；換裝置才需要打。清空 = 不上鎖。
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <input
+                className="text-input"
+                value={password}
+                placeholder="不設密碼"
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button className="btn btn-sm" type="button" onClick={() => setPassword(genPassword())} title="換一組">🎲</button>
+            </div>
+          </div>
+
           <button className="btn btn-primary btn-lg btn-block" disabled={busy || errors.length > 0} onClick={submit}>
             {busy ? '建立中…' : '🐺 開始主持'}
           </button>
