@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent, GameState, RoleId } from '../src';
-import { buildDawnAnnouncement, buildNightPlan, initialState, reduce, replay } from '../src';
+import { buildDawnAnnouncement, buildNightPlan, initialState, reduce, replay, validate } from '../src';
+import { currentNightStep, skipInactive } from '../src/night/plan';
 import { run, makeConfig, ballots, dead, toEnvelopes } from './helpers';
 
 // 邱比特 8 人板：1邱 2預 3女 4獵 5-6民 7-8狼
@@ -300,6 +301,191 @@ describe('種狼：感染', () => {
         { type: 'SEED_WOLF_ACTED', infect: true },
       ]),
     ).toThrow(/狼人陣營/);
+  });
+});
+
+describe('種狼進階版：感染變狼王（seedWolfMakesWolfKing，延後一夜生效）', () => {
+  /** 第一夜（刀4平民）+ 平安白天，進入第二夜可感染的狀態 */
+  const night1AndDay: GameEvent[] = [
+    { type: 'NIGHT_STARTED' },
+    { type: 'WOLVES_ACTED', target: 4 },
+    { type: 'WITCH_ACTED', save: false, poison: null },
+    { type: 'SEER_ACTED', target: 6 },
+    { type: 'NIGHT_ENDED' },
+    { type: 'DEATHS_ANNOUNCED' },
+    { type: 'LAST_WORDS_DONE', seat: 4 },
+    { type: 'EXILE_VOTED', ballots: [] },
+    { type: 'DAY_ENDED' },
+  ];
+
+  it('規則關閉（預設）：感染後角色維持原樣、不出現 wolfKingPending，行為與現況一致', () => {
+    const s = run(seedCfg(), [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+    ]);
+    const p5 = s.players[4]!;
+    expect(p5.role).toBe('villager'); // 角色不變，只有陣營變狼
+    expect(p5.converted).toBe(true);
+    expect(p5.wolfKingPending).toBe(false);
+  });
+
+  it('規則開啟：感染當夜目標天亮結算後 role 變 wolfKing、converted=true、wolfKingPending=true，且不算真死於刀', () => {
+    const s = run(seedCfg({ seedWolfMakesWolfKing: true }), [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+    ]);
+    const p5 = s.players[4]!;
+    expect(p5.alive).toBe(true);
+    expect(p5.role).toBe('wolfKing');
+    expect(p5.converted).toBe(true);
+    expect(p5.wolfKingPending).toBe(true);
+    expect(s.pendingDeaths).toEqual([]); // 感染擋刀，非死於刀
+
+    const s2 = run(seedCfg({ seedWolfMakesWolfKing: true }), [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+      { type: 'DEATHS_ANNOUNCED' },
+    ]);
+    expect(s2.players[4]!.alive).toBe(true); // 死訊公佈後也仍活著（感染不是死亡）
+  });
+
+  it('wolfKingPending 期間不出現在 buildNightPlan 的狼隊可行動名單（唯一存活狼即待生效狼王時，wolves 步驟不啟用）', () => {
+    // 感染後手動模擬「原生狼與種狼皆已陣亡，僅剩待生效狼王存活」的邊界情境，
+    // 驗證 anyWolfAlive 的排除邏輯（正常事件流下 pending 只會存在於白天，這裡是防禦性單元測試）
+    const s = run(seedCfg({ seedWolfMakesWolfKing: true }), [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+    ]);
+    const forced: GameState = structuredClone(s);
+    forced.players.find((p) => p.role === 'werewolf')!.alive = false;
+    forced.players.find((p) => p.role === 'seedWolf')!.alive = false;
+
+    const plan = buildNightPlan(forced);
+    expect(plan.find((x) => x.id === 'wolves')?.active).toBe(false);
+
+    // 比照 enterNight 的真實行為：stepIndex 落在 skipInactive 後的第一個 active 步驟，
+    // 絕不會停在剛被排除的 wolves 步驟上
+    forced.phase = { t: 'night', stepIndex: skipInactive(plan, 0) };
+    expect(currentNightStep(forced)?.id).not.toBe('wolves');
+
+    const v = validate(forced, { type: 'WOLVES_ACTED', target: 1 });
+    expect(v.ok).toBe(false);
+  });
+
+  it('下一次進入夜晚後 wolfKingPending 清除，該玩家能正常參與狼隊刀人', () => {
+    const s = run(seedCfg({ seedWolfMakesWolfKing: true }), [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+      { type: 'DEATHS_ANNOUNCED' },
+      { type: 'EXILE_VOTED', ballots: [] },
+      { type: 'DAY_ENDED' }, // 進入夜3：狼王正式生效
+    ]);
+    const p5 = s.players[4]!;
+    expect(p5.role).toBe('wolfKing');
+    expect(p5.wolfKingPending).toBe(false);
+    const plan = buildNightPlan(s);
+    expect(plan.find((x) => x.id === 'wolves')?.active).toBe(true);
+
+    // 狼王已能正常參與刀人（不再被排除）
+    const s2 = run(seedCfg({ seedWolfMakesWolfKing: true }), [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+      { type: 'DEATHS_ANNOUNCED' },
+      { type: 'EXILE_VOTED', ballots: [] },
+      { type: 'DAY_ENDED' },
+      { type: 'WOLVES_ACTED', target: 3 }, // 夜3狼刀（狼王已可正常參與此團體行動）
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 5 },
+      { type: 'NIGHT_ENDED' },
+      { type: 'DEATHS_ANNOUNCED' },
+    ]);
+    expect(s2.players[2]!.alive).toBe(false); // 3 號被刀死亡
+    expect(s2.seerChecks[s2.seerChecks.length - 1]).toEqual({ night: 3, target: 5, result: 'wolf' });
+  });
+
+  it('infectedKeepsSkills 交互：狼王本身無死亡技能，即使感染前是獵人、且開啟保留技能也不能開槍', () => {
+    const infectHunter: GameEvent[] = [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 3 }, // 刀獵人
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+      { type: 'DEATHS_ANNOUNCED' },
+      { type: 'EXILE_VOTED', ballots: ballots([1, 3], [2, 3], [5, 3]) }, // 白天放逐被感染的（狼王化）獵人
+    ];
+    const lost = run(seedCfg({ seedWolfMakesWolfKing: true }), infectHunter);
+    expect(lost.players[2]!.role).toBe('wolfKing');
+    expect(lost.players[2]!.alive).toBe(false);
+    expect(lost.actionQueue).toEqual([{ kind: 'lastWords', seat: 3 }]); // 沒有槍（角色已不是獵人）
+
+    const kept = run(seedCfg({ seedWolfMakesWolfKing: true, infectedKeepsSkills: true }), infectHunter);
+    expect(kept.players[2]!.role).toBe('wolfKing');
+    expect(kept.actionQueue).toEqual([{ kind: 'lastWords', seat: 3 }]); // infectedKeepsSkills 對狼王無意義，仍沒有槍
+  });
+
+  it('undo/redo：截斷到感染前的重播應完整回復，不留 wolfKing/wolfKingPending 殘留欄位', () => {
+    const config = seedCfg({ seedWolfMakesWolfKing: true });
+    const events: GameEvent[] = [
+      ...night1AndDay,
+      { type: 'WOLVES_ACTED', target: 5 },
+      { type: 'SEED_WOLF_ACTED', infect: true },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 6 },
+      { type: 'NIGHT_ENDED' },
+      { type: 'DEATHS_ANNOUNCED' },
+      { type: 'EXILE_VOTED', ballots: [] },
+      { type: 'DAY_ENDED' },
+      { type: 'WOLVES_ACTED', target: null },
+      { type: 'WITCH_ACTED', save: false, poison: null },
+      { type: 'SEER_ACTED', target: 5 },
+      { type: 'NIGHT_ENDED' },
+    ];
+    const envelopes = toEnvelopes(config, events);
+
+    // undo 到「發動感染」事件之前：回放較短的事件流，狀態必須完全乾淨（無殘留欄位）
+    const infectSeq = envelopes.find((e) => e.event.type === 'SEED_WOLF_ACTED')!.seq;
+    const beforeInfect = replay(envelopes.filter((e) => e.seq < infectSeq));
+    expect(beforeInfect.players[4]!.role).toBe('villager');
+    expect(beforeInfect.players[4]!.converted).toBe(false);
+    expect(beforeInfect.players[4]!.wolfKingPending).toBe(false);
+
+    // redo（重新 append 完整事件流）與逐事件增量 reduce 必須逐步等價（一致性驗證，同「回放一致性」寫法）
+    let incremental: GameState | null = null;
+    for (let i = 0; i < envelopes.length; i++) {
+      const env = envelopes[i]!;
+      incremental =
+        i === 0
+          ? initialState((env.event as { type: 'GAME_CREATED'; config: never }).config, env.seq, env.at)
+          : reduce(incremental!, env);
+      expect(replay(envelopes.slice(0, i + 1))).toEqual(incremental);
+    }
+    expect(incremental!.players[4]!.role).toBe('wolfKing');
+    expect(incremental!.players[4]!.wolfKingPending).toBe(false); // 夜3已開始，早已生效
   });
 });
 

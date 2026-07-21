@@ -29,6 +29,11 @@ export interface PlayerState {
   idiotRevealed: boolean;
   /** 被種狼感染：轉入狼人陣營（技能是否保留依 infectedKeepsSkills） */
   converted: boolean;
+  /**
+   * seedWolfMakesWolfKing 開啟時：已轉換為狼王但延後一夜生效——陣營已是狼（factionOf 照算），
+   * 但本夜尚不能加入狼隊刀人。下一次 NIGHT_STARTED/enterNight 時清為 false（正式生效）。
+   */
+  wolfKingPending: boolean;
   canVote: boolean;
   /** 一次性主動技能已用（騎士決鬥） */
   skillUsed: boolean;

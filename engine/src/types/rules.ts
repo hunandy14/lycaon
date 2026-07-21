@@ -23,6 +23,8 @@ export interface RuleConfig {
   seedWolfFirstNight: boolean;
   /** 被感染者保留原技能（預設失去技能、變普通狼） */
   infectedKeepsSkills: boolean;
+  /** 種狼感染後轉為「狼王」而非普通狼人；延後一夜才加入狼隊刀人（預設關閉＝維持普通感染） */
+  seedWolfMakesWolfKing: boolean;
 }
 
 export const DEFAULT_RULES: RuleConfig = {
@@ -36,6 +38,7 @@ export const DEFAULT_RULES: RuleConfig = {
   lovesickCanShoot: false,
   seedWolfFirstNight: false,
   infectedKeepsSkills: false,
+  seedWolfMakesWolfKing: false,
 };
 
 export type PresetId = 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'cupid12' | 'seedWolf12' | 'custom';

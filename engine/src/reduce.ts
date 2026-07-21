@@ -30,6 +30,7 @@ export function initialState(config: GameConfig, seq: number, at: string): GameS
         alive: true,
         idiotRevealed: false,
         converted: false,
+        wolfKingPending: false,
         canVote: true,
         skillUsed: false,
       })),
@@ -60,6 +61,8 @@ function enterNight(ctx: Ctx): void {
   state.night = { ...EMPTY_NIGHT };
   state.exile = null;
   state.dayInterrupted = false;
+  // 上一夜轉換的狼王正式生效：本夜起可加入狼隊刀人
+  for (const p of state.players) p.wolfKingPending = false;
   state.phase = { t: 'night', stepIndex: 0 };
   state.phase.stepIndex = skipInactive(buildNightPlan(state), 0);
   pushLog(ctx, `天黑請閉眼（第 ${state.day} 夜）`, false);
@@ -151,8 +154,19 @@ export function reduce(state: GameState, envelope: EventEnvelope): GameState {
       // 種狼感染於天亮生效：刀口轉入狼人陣營（同夜被毒仍會死，見 settleNight）
       if (next.night.infect && next.night.wolfTarget !== null) {
         const infected = next.players.find((p) => p.seat === next.night.wolfTarget)!;
+        const prevRoleName = roleName(infected.role);
         infected.converted = true;
-        pushLog(ctx, `🦠 ${seatLabel(next, infected.seat)}【${roleName(infected.role)}】已被感染，加入狼人陣營`, true);
+        if (next.config.rules.seedWolfMakesWolfKing) {
+          infected.role = 'wolfKing';
+          infected.wolfKingPending = true;
+          pushLog(
+            ctx,
+            `🦠 ${seatLabel(next, infected.seat)}【${prevRoleName}】已被感染，蛻變為狼王（下一夜起才能加入刀人）`,
+            true,
+          );
+        } else {
+          pushLog(ctx, `🦠 ${seatLabel(next, infected.seat)}【${prevRoleName}】已被感染，加入狼人陣營`, true);
+        }
       }
       const summary =
         next.pendingDeaths.length === 0
