@@ -1,47 +1,85 @@
 import type { RoleId } from './types/roles';
 import { ROLE_META, roleName } from './types/roles';
-import type { GameConfig } from './types/rules';
+import type { GameConfig, PresetId, RuleConfig } from './types/rules';
+
+export type BoardCategory = 'basic' | 'specialWolf' | 'special';
 
 export interface BoardPreset {
-  id: 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'cupid12' | 'seedWolf12';
+  id: Exclude<PresetId, 'custom'>;
   name: string;
+  category: BoardCategory;
   playerCount: number;
   roles: RoleId[]; // 長度 = playerCount
+  /** 選此板時一併套用的規則覆寫（例如種狼變狼王板需開 seedWolfMakesWolfKing） */
+  rules?: Partial<RuleConfig>;
 }
+
+export const BOARD_CATEGORIES: { id: BoardCategory; name: string }[] = [
+  { id: 'basic', name: '基礎標準' },
+  { id: 'specialWolf', name: '特色狼人' },
+  { id: 'special', name: '特殊機制' },
+];
 
 const villagers = (n: number): RoleId[] => Array(n).fill('villager');
 const wolves = (n: number): RoleId[] => Array(n).fill('werewolf');
 
 export const BOARD_PRESETS: BoardPreset[] = [
   {
+    id: 'standard9',
+    name: '預女獵（9人屠邊）',
+    category: 'basic',
+    playerCount: 9,
+    roles: ['seer', 'witch', 'hunter', ...villagers(3), ...wolves(3)],
+  },
+  {
+    id: 'standard10',
+    name: '預女獵（10人屠邊）',
+    category: 'basic',
+    playerCount: 10,
+    roles: ['seer', 'witch', 'hunter', ...villagers(4), ...wolves(3)],
+  },
+  {
     id: 'standard12',
     name: '預女獵白（12人標準局）',
+    category: 'basic',
     playerCount: 12,
     roles: ['seer', 'witch', 'hunter', 'idiot', ...villagers(4), ...wolves(4)],
   },
   {
     id: 'wolfKingGuard12',
     name: '狼王守衛（12人）',
+    category: 'specialWolf',
     playerCount: 12,
     roles: ['seer', 'witch', 'hunter', 'guard', ...villagers(4), ...wolves(3), 'blackWolfKing'],
   },
   {
     id: 'whiteWolfKnight12',
     name: '白狼王騎士（12人）',
+    category: 'specialWolf',
     playerCount: 12,
     roles: ['seer', 'witch', 'idiot', 'knight', ...villagers(4), ...wolves(3), 'whiteWolfKing'],
   },
   {
-    id: 'cupid12',
-    name: '邱比特（12人）',
-    playerCount: 12,
-    roles: ['seer', 'witch', 'hunter', 'cupid', ...villagers(4), ...wolves(4)],
-  },
-  {
     id: 'seedWolf12',
     name: '種狼（12人）',
+    category: 'specialWolf',
     playerCount: 12,
     roles: ['seer', 'witch', 'hunter', 'idiot', ...villagers(4), ...wolves(3), 'seedWolf'],
+  },
+  {
+    id: 'seedWolfKing12',
+    name: '種狼變狼王（12人）',
+    category: 'specialWolf',
+    playerCount: 12,
+    roles: ['seer', 'witch', 'hunter', 'idiot', ...villagers(5), ...wolves(2), 'seedWolf'],
+    rules: { seedWolfMakesWolfKing: true },
+  },
+  {
+    id: 'cupid12',
+    name: '邱比特（12人）',
+    category: 'special',
+    playerCount: 12,
+    roles: ['seer', 'witch', 'hunter', 'cupid', ...villagers(4), ...wolves(4)],
   },
 ];
 

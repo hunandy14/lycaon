@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ALL_ROLES,
+  BOARD_CATEGORIES,
   BOARD_PRESETS,
   DEFAULT_RULES,
   ROLE_META,
   validateConfig,
+  type BoardCategory,
   type GameConfig,
   type PresetId,
   type RoleId,
@@ -25,6 +27,8 @@ const STEP_LABEL: Record<Step, string> = { board: '板子', pool: '角色池', r
 
 type Pool = Partial<Record<RoleId, number>>;
 
+const DEFAULT_PRESET = BOARD_PRESETS.find((p) => p.id === 'standard12') ?? BOARD_PRESETS[0]!;
+
 /** 只能一張的角色（平民與普通狼人可複數） */
 const MULTI_ROLES: RoleId[] = ['villager', 'werewolf'];
 const GROUPS: { label: string; roles: RoleId[] }[] = [
@@ -37,7 +41,8 @@ export function NewGamePage() {
   const nav = useNavigate();
   const [step, setStep] = useState<Step>('board');
   const [presetId, setPresetId] = useState<PresetId>('standard12');
-  const [pool, setPool] = useState<Pool>(() => poolFromRoles(BOARD_PRESETS[0]!.roles));
+  const [boardCat, setBoardCat] = useState<BoardCategory>('basic');
+  const [pool, setPool] = useState<Pool>(() => poolFromRoles(DEFAULT_PRESET.roles));
   const [seats, setSeats] = useState<SeatConfig[]>([]);
   const [rules, setRules] = useState<RuleConfig>({ ...DEFAULT_RULES });
   const [title, setTitle] = useState('');
@@ -72,6 +77,8 @@ export function NewGamePage() {
     setPresetId(id);
     const preset = BOARD_PRESETS.find((p) => p.id === id);
     setPool(preset ? poolFromRoles(preset.roles) : {});
+    // 板子帶的規則覆寫（如種狼變狼王）在此套用；未帶覆寫的板子回到預設規則
+    setRules({ ...DEFAULT_RULES, ...(preset?.rules ?? {}) });
   };
 
   const enterSeats = () => {
@@ -124,14 +131,30 @@ export function NewGamePage() {
         <section>
           <h2 style={{ marginBottom: 4 }}>選擇板子</h2>
           <p className="muted small" style={{ marginBottom: 12 }}>標準板子配置平衡；人數不同或想亂玩，下一步可以自由調整角色池。</p>
-          {BOARD_PRESETS.map((p) => (
+
+          <div className="row row-wrap" style={{ gap: 6, marginBottom: 12 }}>
+            {BOARD_CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                className={`btn btn-sm ${boardCat === c.id ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setBoardCat(c.id)}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+
+          {BOARD_PRESETS.filter((p) => p.category === boardCat).map((p) => (
             <button
               key={p.id}
               className="card"
               style={cardStyle(presetId === p.id)}
               onClick={() => choosePreset(p.id)}
             >
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>{p.name}</div>
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span style={{ fontWeight: 700 }}>{p.name}</span>
+                <span className="muted small">{p.playerCount} 人</span>
+              </div>
               <div className="row row-wrap" style={{ gap: 4 }}>
                 {roleTally(p.roles).map(([role, n]) => (
                   <span key={role} className="pill" style={{ color: factionColor(role) }}>

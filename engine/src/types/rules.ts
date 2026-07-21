@@ -41,7 +41,16 @@ export const DEFAULT_RULES: RuleConfig = {
   seedWolfMakesWolfKing: false,
 };
 
-export type PresetId = 'standard12' | 'wolfKingGuard12' | 'whiteWolfKnight12' | 'cupid12' | 'seedWolf12' | 'custom';
+export type PresetId =
+  | 'standard9'
+  | 'standard10'
+  | 'standard12'
+  | 'wolfKingGuard12'
+  | 'whiteWolfKnight12'
+  | 'cupid12'
+  | 'seedWolf12'
+  | 'seedWolfKing12'
+  | 'custom';
 
 export interface SeatConfig {
   seat: SeatId;
