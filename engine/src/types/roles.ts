@@ -10,7 +10,8 @@ export type RoleId =
   | 'werewolf'
   | 'blackWolfKing'
   | 'whiteWolfKing'
-  | 'seedWolf';
+  | 'seedWolf'
+  | 'wolfKing';
 
 export type Faction = 'good' | 'wolf';
 export type RoleClass = 'god' | 'villager' | 'wolf';
@@ -37,6 +38,8 @@ export const ROLE_META: Record<RoleId, RoleMeta> = {
   blackWolfKing: { name: '黑狼王', short: '黑狼', faction: 'wolf', cls: 'wolf', deathSkill: 'shoot' },
   whiteWolfKing: { name: '白狼王', short: '白狼', faction: 'wolf', cls: 'wolf' },
   seedWolf: { name: '種狼', short: '種狼', faction: 'wolf', cls: 'wolf' },
+  // 種狼感染後（seedWolfMakesWolfKing 開啟時）的轉換身分；無額外死亡技能，延後一夜才加入刀人見 reduce.ts
+  wolfKing: { name: '狼王', short: '狼王', faction: 'wolf', cls: 'wolf' },
 };
 
 export const ALL_ROLES = Object.keys(ROLE_META) as RoleId[];

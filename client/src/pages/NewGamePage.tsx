@@ -164,7 +164,7 @@ export function NewGamePage() {
         />
       )}
 
-      {step === 'rules' && <RulesStep rules={rules} setRules={setRules} onNext={enterSeats} />}
+      {step === 'rules' && <RulesStep rules={rules} setRules={setRules} pool={pool} onNext={enterSeats} />}
 
       {step === 'seats' && (
         <section>
@@ -365,8 +365,19 @@ function WizardHeader({ step, onBack }: { step: Step; onBack: () => void }) {
   );
 }
 
-function RulesStep({ rules, setRules, onNext }: { rules: RuleConfig; setRules: (r: RuleConfig) => void; onNext: () => void }) {
+function RulesStep({
+  rules,
+  setRules,
+  pool,
+  onNext,
+}: {
+  rules: RuleConfig;
+  setRules: (r: RuleConfig) => void;
+  pool: Pool;
+  onNext: () => void;
+}) {
   const T = (patch: Partial<RuleConfig>) => setRules({ ...rules, ...patch });
+  const hasSeedWolf = (pool.seedWolf ?? 0) > 0;
   return (
     <section>
       <h2 style={{ marginBottom: 12 }}>規則設定</h2>
@@ -395,6 +406,14 @@ function RulesStep({ rules, setRules, onNext }: { rules: RuleConfig; setRules: (
       <ToggleRow label="殉情可以開槍" hint="情侶殉情死亡的獵人／黑狼王仍可發動技能" value={rules.lovesickCanShoot} onChange={(v) => T({ lovesickCanShoot: v })} />
       <ToggleRow label="種狼首夜可感染" hint="關閉時依標準規則：第二夜起才能發動感染" value={rules.seedWolfFirstNight} onChange={(v) => T({ seedWolfFirstNight: v })} />
       <ToggleRow label="被感染者保留技能" hint="關閉時依標準規則：感染後失去原技能、變普通狼" value={rules.infectedKeepsSkills} onChange={(v) => T({ infectedKeepsSkills: v })} />
+      {hasSeedWolf && (
+        <ToggleRow
+          label="種狼感染變狼王"
+          hint="開啟後被感染者天亮變成狼王，感染後下一夜才正式加入刀人"
+          value={rules.seedWolfMakesWolfKing}
+          onChange={(v) => T({ seedWolfMakesWolfKing: v })}
+        />
+      )}
       <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }} onClick={onNext}>
         下一步：輸入角色
       </button>

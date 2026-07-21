@@ -33,9 +33,11 @@ export function buildNightPlan(state: GameState): NightStep[] {
   const guard = find('guard');
   if (guard) push('guard', guard.alive && hasSkills(guard, rules));
 
-  // 狼人步驟：含被感染轉狼者；狼全滅前遊戲必已結束
+  // 狼人步驟：含被感染轉狼者；狼全滅前遊戲必已結束。
+  // wolfKingPending（seedWolfMakesWolfKing 開啟時，剛轉換尚未生效的狼王）不算入可行動的狼，
+  // 若場上唯一存活的狼隊成員正是待生效狼王，本夜狼隊步驟直接不啟用。
   const hasWolf = state.players.some((p) => factionOf(p) === 'wolf');
-  const anyWolfAlive = state.players.some((p) => p.alive && factionOf(p) === 'wolf');
+  const anyWolfAlive = state.players.some((p) => p.alive && factionOf(p) === 'wolf' && !p.wolfKingPending);
   if (hasWolf) push('wolves', anyWolfAlive);
 
   // 種狼：跟在狼人刀口之後單獨睜眼；標準版第二夜起才可感染；
