@@ -68,6 +68,11 @@ export function SeatGrid({ state, eligible, selected, onPick, markers, showRoles
               {lovers.has(p.seat) && <span className="chip chip-lover">💘{thirdParty.size > 0 ? '三方' : ''}</span>}
               {thirdParty.has(p.seat) && !lovers.has(p.seat) && <span className="chip chip-lover">三方</span>}
               {p.converted && <span className="chip chip-wolf">感染</span>}
+              {p.wolfKingPending && (
+                <span className="chip chip-wolf" title="已轉為狼王，下一夜才正式加入刀人">
+                  狼王・尚未生效
+                </span>
+              )}
               {check && <span className={`chip chip-${check}`}>{check === 'wolf' ? '查殺' : '金水'}</span>}
               {p.idiotRevealed && <span className="chip chip-idiot">白癡</span>}
               {pendingDead.has(p.seat) && !dead && <span className="chip chip-pending">待公佈</span>}

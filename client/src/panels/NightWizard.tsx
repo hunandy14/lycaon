@@ -184,8 +184,16 @@ function SeedWolfStep({ state, dispatch, busy }: PanelProps) {
     knifed !== null &&
     (() => {
       const t = state.players.find((p) => p.seat === knifed)!;
-      return !t.converted && t.role !== 'werewolf' && t.role !== 'blackWolfKing' && t.role !== 'whiteWolfKing' && t.role !== 'seedWolf';
+      return (
+        !t.converted &&
+        t.role !== 'werewolf' &&
+        t.role !== 'blackWolfKing' &&
+        t.role !== 'whiteWolfKing' &&
+        t.role !== 'seedWolf' &&
+        t.role !== 'wolfKing'
+      );
     })();
+  const makesWolfKing = state.config.rules.seedWolfMakesWolfKing;
 
   return (
     <div>
@@ -198,7 +206,10 @@ function SeedWolfStep({ state, dispatch, busy }: PanelProps) {
         <div className="panel-title">{STEP_TITLE.seedWolf}</div>
         <div className="panel-hint">
           {knifed !== null ? (
-            <>今晚刀口：<b>{seatText(state, knifed)}</b>。發動感染則刀口不死、轉入狼人陣營（一局一次）。</>
+            <>
+              今晚刀口：<b>{seatText(state, knifed)}</b>。發動感染則刀口不死、轉入狼人陣營（一局一次）。
+              {makesWolfKing && '感染後變狼王，下一夜才會正式加入刀人。'}
+            </>
           ) : (
             '今晚狼人空刀，沒有可感染的對象。'
           )}
