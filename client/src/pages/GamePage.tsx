@@ -128,6 +128,7 @@ export function GamePage() {
         open={openChat === 'ai'}
         onToggle={() => setOpenChat((v) => (v === 'ai' ? null : 'ai'))}
         slot={aiSlot}
+        size="lg"
       >
         <ChatRoom ai gameId={id} />
       </ChatFab>

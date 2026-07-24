@@ -1292,6 +1292,14 @@
       opacity: 0;
     }
   }
+  /* AI 規則助手面板專屬加大（見 ChatFab 的 size="lg"），寬螢幕才生效，手機貼底樣式不動 */
+  .fab-panel-lg {
+    width: min(680px, 92vw);
+    height: 75vh;
+  }
+  .fab-panel-lg .ai-msg-row {
+    max-width: 95%;
+  }
 }
 .fab-panel-header {
   flex: 0 0 auto;

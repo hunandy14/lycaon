@@ -12,6 +12,7 @@ export function ChatFab({
   open,
   onToggle,
   slot = 0,
+  size = 'sm',
   headerExtra,
   children,
 }: {
@@ -22,6 +23,8 @@ export function ChatFab({
   open: boolean;
   onToggle: () => void;
   slot?: number;
+  /** 面板尺寸：sm=既有大小（預設）、lg=寬螢幕加大（見 GamePage 的 AI 規則助手球）。手機貼底樣式不受影響。 */
+  size?: 'sm' | 'lg';
   /** 標題列右側附加內容（如暱稱 chip），排在關閉鈕左邊 */
   headerExtra?: ReactNode;
   children: ReactNode;
@@ -40,7 +43,10 @@ export function ChatFab({
         {!open && unread > 0 && <span className="fab-badge">{unread > 9 ? '9+' : unread}</span>}
       </button>
       {open && (
-        <div className="fab-panel" style={{ '--fab-slot': slot } as CSSProperties}>
+        <div
+          className={`fab-panel${size === 'lg' ? ' fab-panel-lg' : ''}`}
+          style={{ '--fab-slot': slot } as CSSProperties}
+        >
           <div className="fab-panel-header">
             <span className="fab-panel-title">
               <Icon size={16} /> {label}
