@@ -1,7 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Pencil, SendHorizontal } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, roomPass, type ChatMessage, type ChatScope } from '../api';
 import { Toast } from './Toast';
+
+/** AI 回覆的 markdown 渲染白名單：不加 rehype-raw（不解析原始 HTML），純 remark-gfm 語法即可涵蓋規則問答
+ *  常見的清單/表格/粗體/連結需求。unwrapDisallowed=true：白名單外的元素拆殼保留純文字，不整段吃掉。 */
+const AI_MD_ALLOWED = [
+  'p', 'strong', 'em', 'del', 'code', 'pre',
+  'ul', 'ol', 'li', 'a',
+  'h1', 'h2', 'h3', 'h4',
+  'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'br',
+];
+
+/** AI 回覆泡泡：markdown 渲染（GM 自己的提問維持純文字，見下方呼叫端）。a 一律開新分頁並帶 noopener。 */
+function AiMarkdown({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      allowedElements={AI_MD_ALLOWED}
+      unwrapDisallowed
+      components={{
+        a: ({ children, ...props }) => (
+          <a {...props} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        ),
+        // table 本身維持原生 table 版面（欄位對齊），外面包一層可橫向捲動的容器防止在窄螢幕撐爆泡泡
+        table: ({ children, ...props }) => (
+          <div className="ai-md-table-wrap">
+            <table {...props}>{children}</table>
+          </div>
+        ),
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}
 
 const NICK_KEY = 'lycaon:chatnick';
 /** NickChip 改名時廣播，讓同頁所有 ChatRoom 同步拿到新暱稱 */
@@ -357,7 +394,7 @@ function AiChatRoom({ gameId }: { gameId: string }) {
                 <span aria-hidden="true">🤖</span> 規則助手
               </span>
             )}
-            <span className="ai-msg-bubble">{m.text}</span>
+            <div className="ai-msg-bubble">{m.isGm ? m.text : <AiMarkdown text={m.text} />}</div>
           </div>
         ))}
         {sending && (
@@ -366,12 +403,12 @@ function AiChatRoom({ gameId }: { gameId: string }) {
               <span aria-hidden="true">🤖</span> 規則助手
             </span>
             {streamText === null ? (
-              <span className="ai-msg-bubble ai-msg-thinking">思考中…</span>
+              <div className="ai-msg-bubble ai-msg-thinking">思考中…</div>
             ) : (
-              <span className="ai-msg-bubble">
-                {streamText}
+              <div className="ai-msg-bubble">
+                <AiMarkdown text={streamText} />
                 <span className="ai-msg-caret" aria-hidden="true" />
-              </span>
+              </div>
             )}
           </div>
         )}
