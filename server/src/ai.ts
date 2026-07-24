@@ -67,7 +67,6 @@ export async function* askAiStream(
     const decoder = new TextDecoder();
     let buf = '';
     let sawContent = false;
-    let finished = false;
     try {
       readLoop: while (true) {
         let chunk: Awaited<ReturnType<typeof reader.read>>;
@@ -85,10 +84,7 @@ export async function* askAiStream(
           buf = buf.slice(nl + 1);
           if (!line.startsWith('data:')) continue;
           const payload = line.slice(5).trim();
-          if (payload === '[DONE]') {
-            finished = true;
-            break readLoop;
-          }
+          if (payload === '[DONE]') break readLoop;
           let parsed: UpstreamChunk;
           try {
             parsed = JSON.parse(payload) as UpstreamChunk;
@@ -103,7 +99,10 @@ export async function* askAiStream(
         }
       }
     } finally {
-      if (!finished) await reader.cancel().catch(() => {});
+      // 無論收到 [DONE]、傳輸層 EOF 還是中止/例外，都要 cancel 底層 reader：
+      // [DONE] 只是應用層標記，此時 fetch stream 尚未讀到 EOF，不 cancel 會讓 undici 連線
+      // 留在半讀狀態、無法歸還連線池（每次成功問答洩漏一條上游連線）。cancel 對已收尾的 stream 是安全 no-op。
+      await reader.cancel().catch(() => {});
     }
     if (!sawContent) throw new Error('AI 回應缺少內容');
   } finally {
