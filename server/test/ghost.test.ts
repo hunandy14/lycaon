@@ -123,6 +123,36 @@ describe('聊天分房隔離', () => {
     expect(watchBody.messages).toHaveLength(1);
     expect(watchBody.messages[0]).toMatchObject({ text: '陽間哈囉', scope: 'watch' });
   });
+
+  it('resolveScope 白名單：scope=ai 一律落在 ghost 房，ai 房完全不受影響（防重構回退）', async () => {
+    const { app, ghostToken } = setup({}, hashPassword('1234'));
+
+    const post = await app.request(`/api/ghost/${ghostToken}/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': '3.3.3.3' },
+      body: JSON.stringify({ nick: '死者甲', text: '假冒 ai 房', scope: 'ai' }),
+    });
+    expect(post.status).toBe(201);
+    const posted = await post.json();
+    expect(posted.scope).toBe('ghost'); // 白名單外一律落 ghost，不是照抄 body.scope
+
+    // GET ?scope=ai 同理讀不到獨立的 ai 房，讀到的是 ghost 房內容
+    const getAi = await app.request(`/api/ghost/${ghostToken}/chat?scope=ai`);
+    const getAiBody = await getAi.json();
+    expect(getAiBody.messages).toHaveLength(1);
+    expect(getAiBody.messages[0]).toMatchObject({ text: '假冒 ai 房', scope: 'ghost' });
+
+    // 與明確 scope=ghost 讀到的內容一致，證明兩者是同一間房
+    const getGhost = await app.request(`/api/ghost/${ghostToken}/chat?scope=ghost`);
+    const getGhostBody = await getGhost.json();
+    expect(getGhostBody.messages).toEqual(getAiBody.messages);
+
+    // 真正的 ai 房（GM 規則助手，走 /api/games/:id/ai-chat）完全沒被寫進東西
+    const gmAi = await app.request(`/api/games/g1/ai-chat`, { headers: { 'x-room-password': '1234' } });
+    expect(gmAi.status).toBe(200);
+    const gmAiBody = await gmAi.json();
+    expect(gmAiBody.messages).toEqual([]);
+  });
 });
 
 describe('GM 聊天通道權限與 rate limit', () => {

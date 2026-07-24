@@ -1,7 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Pencil, SendHorizontal } from 'lucide-react';
-import { api, type ChatMessage, type ChatScope } from '../api';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { api, roomPass, type ChatMessage, type ChatScope } from '../api';
 import { Toast } from './Toast';
+
+/** AI 回覆的 markdown 渲染白名單：不加 rehype-raw（不解析原始 HTML），純 remark-gfm 語法即可涵蓋規則問答
+ *  常見的清單/表格/粗體/連結需求。unwrapDisallowed=true：白名單外的元素拆殼保留純文字，不整段吃掉。 */
+const AI_MD_ALLOWED = [
+  'p', 'strong', 'em', 'del', 'code', 'pre',
+  'ul', 'ol', 'li', 'a',
+  'h1', 'h2', 'h3', 'h4',
+  'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'br',
+];
+
+/** AI 回覆泡泡：markdown 渲染（GM 自己的提問維持純文字，見下方呼叫端）。a 一律開新分頁並帶 noopener。 */
+function AiMarkdown({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      allowedElements={AI_MD_ALLOWED}
+      unwrapDisallowed
+      components={{
+        a: ({ children, ...props }) => (
+          <a {...props} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        ),
+        // table 本身維持原生 table 版面（欄位對齊），外面包一層可橫向捲動的容器防止在窄螢幕撐爆泡泡
+        table: ({ children, ...props }) => (
+          <div className="ai-md-table-wrap">
+            <table {...props}>{children}</table>
+          </div>
+        ),
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}
 
 const NICK_KEY = 'lycaon:chatnick';
 /** NickChip 改名時廣播，讓同頁所有 ChatRoom 同步拿到新暱稱 */
@@ -70,6 +107,7 @@ type ChatRoomProps =
   | {
       /** 觀戰/陰間端：base='watch' 走 /api/watch（同樂邀請連結），base='ghost' 走 /api/ghost 並帶 scope 分房。 */
       gm?: false;
+      ai?: false;
       token: string;
       base?: 'watch' | 'ghost';
       scope?: ChatScope;
@@ -79,14 +117,29 @@ type ChatRoomProps =
   | {
       /** GM 監看／發言：走 /api/games/:id/chat（需房主密碼）；免暱稱、固定顯示暱稱 'GM'。 */
       gm: true;
+      ai?: false;
       gameId: string;
       scope: ChatScope;
+    }
+  | {
+      /** GM × AI 規則助手：走 /api/games/:id/ai-chat（需房主密碼）。GM 提問、AI 回覆，無暱稱列、無 SSE/輪詢
+       *  （單一寫者，開面板時 GET 一次即可）。與上兩變體差異夠大，實際渲染另開 AiChatRoom。 */
+      gm?: false;
+      ai: true;
+      gameId: string;
     };
 
-/** 聊天室內容層（訊息列表＋輸入列＋SSE/輪詢同步＋暱稱 localStorage＋黏底捲動＋GM 徽章＋錯誤 Toast）。
+/** 聊天室內容層：依 props.ai 分流到 AI 助手模式（見下方 AiChatRoom），其餘沿用觀戰/陰間/GM 監看的既有邏輯。
  *  不含外框標題／關閉鈕（那些由 ChatFab 面板提供）。從 WatchChat.tsx 抽出，GmChatSheet.tsx 的
  *  GM 輪詢邏輯併入為 gm=true 分支。 */
 export function ChatRoom(props: ChatRoomProps) {
+  if (props.ai === true) return <AiChatRoom gameId={props.gameId} />;
+  return <StandardChatRoom {...props} />;
+}
+
+type StandardChatRoomProps = Exclude<ChatRoomProps, { ai: true }>;
+
+function StandardChatRoom(props: StandardChatRoomProps) {
   const gm = props.gm === true;
   const scope: ChatScope = props.scope ?? 'watch';
   const base = !gm ? props.base ?? 'watch' : undefined;
@@ -217,6 +270,166 @@ export function ChatRoom(props: ChatRoomProps) {
           maxLength={200}
           value={text}
           disabled={disabled}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void send();
+          }}
+        />
+        <button
+          className="btn btn-primary btn-sm chat-send-btn"
+          disabled={!canSend}
+          aria-label="送出"
+          onClick={() => void send()}
+        >
+          <SendHorizontal size={18} />
+        </button>
+      </div>
+      <Toast message={err} onClose={() => setErr(null)} />
+    </div>
+  );
+}
+
+/** 問答文字長度上限（比照 server 契約：trim 後 1–500 字） */
+const AI_TEXT_MAX = 500;
+
+/** GM × AI 規則助手（gm=true 的第三變體）：無暱稱列，GM 提問／AI 回覆。無 SSE、無輪詢——單一寫者
+ *  （只有 GM 自己會發言），開面板時 GET 一次歷史即可。送出後本地先樂觀顯示提問泡泡＋「思考中…」佔位
+ *  （鎖定輸入），回覆走串流（api.sendAiChatStream）：delta 逐塊 append 到進行中泡泡（streamText），
+ *  done 後用 server 回的 question/reply（已落庫的真實記錄）取代本地暫存並解鎖；error 事件或連線失敗
+ *  只清進行中泡泡、問題泡泡照留（server 端問題其實已寫入歷史，就地保留顯示即可），Toast 顯示錯誤。 */
+function AiChatRoom({ gameId }: { gameId: string }) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  /** 進行中泡泡是否該顯示：送出即 true，onDone/onError 立刻轉 false（與換上真實記錄同一次 commit，
+   *  避免回覆泡泡短暫重複）。與 sending 分離——sending 維持到 finally 才放（守住「同時只一則在途」不變式）。 */
+  const [streaming, setStreaming] = useState(false);
+  /** 進行中的 AI 回覆逐塊累積文字；null=尚無 delta（顯示「思考中…」） */
+  const [streamText, setStreamText] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const localIdRef = useRef(-1);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getAiChat(gameId, roomPass.get(gameId))
+      .then((r) => {
+        if (cancelled) return;
+        setEnabled(r.enabled);
+        setMessages(r.messages);
+      })
+      .catch((e) => {
+        if (!cancelled) setErr((e as Error).message || '規則助手載入失敗');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
+
+  useEffect(() => {
+    if (stickRef.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+  }, [messages, streaming, streamText]);
+
+  const handleScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
+  };
+
+  const send = async () => {
+    if (enabled !== true || sending) return;
+    const trimmedText = text.trim();
+    if (trimmedText.length < 1 || trimmedText.length > AI_TEXT_MAX) return;
+    const localId = localIdRef.current--;
+    const localQuestion: ChatMessage = {
+      id: localId,
+      gameId,
+      nick: 'GM',
+      text: trimmedText,
+      scope: 'ai',
+      isGm: true,
+      createdAt: new Date().toISOString(),
+    };
+    stickRef.current = true;
+    setMessages((prev) => [...prev, localQuestion]);
+    setText('');
+    setSending(true);
+    setStreaming(true);
+    setStreamText(null);
+    try {
+      await api.sendAiChatStream(gameId, roomPass.get(gameId), trimmedText, {
+        onDelta: (delta) => setStreamText((prev) => (prev ?? '') + delta),
+        onDone: (question, reply) => {
+          // 同一次 commit：換上落庫後的真實記錄 + 收掉進行中泡泡，避免回覆短暫重複兩份
+          // （sending 留到 finally 才放，這段期間仍鎖輸入，守住「同時只一則在途」）
+          setMessages((prev) => [...prev.filter((m) => m.id !== localId), question, reply]);
+          setStreaming(false);
+        },
+        // error 事件（上游中途失敗/連線中斷）：問題泡泡保留，僅 Toast 提示；進行中泡泡立刻收掉
+        onError: (message) => {
+          setStreaming(false);
+          setErr(message);
+        },
+      });
+    } catch (e) {
+      // 非串流短路（400/401/503）或網路失敗：問題泡泡照留，不移除 localQuestion
+      setErr((e as Error).message || 'AI 助手回覆失敗');
+    } finally {
+      setStreaming(false);
+      setStreamText(null);
+      setSending(false);
+    }
+  };
+
+  const canSend = enabled === true && !sending && !!text.trim() && text.trim().length <= AI_TEXT_MAX;
+
+  if (enabled === false) {
+    return <p className="faint small center" style={{ marginTop: 16 }}>AI 助手未設定（見 server/.env.example）</p>;
+  }
+
+  return (
+    <div className="chat-room ai-chat-room">
+      <div ref={listRef} className="chat-list" onScroll={handleScroll}>
+        {enabled === null && <p className="faint small center">載入中…</p>}
+        {enabled === true && messages.length === 0 && !sending && (
+          <p className="faint small center">問點規則問題吧，例如「獵人被毒死能不能開槍？」</p>
+        )}
+        {messages.map((m) => (
+          <div key={m.id} className={`ai-msg-row ${m.isGm ? 'ai-msg-gm' : 'ai-msg-ai'}`}>
+            {!m.isGm && (
+              <span className="chip chip-ai ai-msg-badge">
+                <span aria-hidden="true">🤖</span> 規則助手
+              </span>
+            )}
+            <div className="ai-msg-bubble">{m.isGm ? m.text : <AiMarkdown text={m.text} />}</div>
+          </div>
+        ))}
+        {streaming && (
+          <div className="ai-msg-row ai-msg-ai">
+            <span className="chip chip-ai ai-msg-badge">
+              <span aria-hidden="true">🤖</span> 規則助手
+            </span>
+            {streamText === null ? (
+              <div className="ai-msg-bubble ai-msg-thinking">思考中…</div>
+            ) : (
+              <div className="ai-msg-bubble">
+                <AiMarkdown text={streamText} />
+                <span className="ai-msg-caret" aria-hidden="true" />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="chat-input-row">
+        <input
+          className="text-input chat-text-input"
+          placeholder={enabled === true ? '問點規則問題…' : '規則助手未啟用'}
+          maxLength={AI_TEXT_MAX}
+          value={text}
+          disabled={enabled !== true || sending}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void send();

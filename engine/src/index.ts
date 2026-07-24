@@ -16,4 +16,5 @@ export { reduce, replay, initialState, EngineError } from './reduce';
 export * from './selectors';
 export * from './report';
 export * from './watch';
+export { buildSituationSummary } from './summary';
 export { phaseLabel } from './ctx';

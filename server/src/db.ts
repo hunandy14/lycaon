@@ -22,8 +22,8 @@ export interface GameRow {
   updated_at: string;
 }
 
-/** 聊天房別：觀戰端「陽間」或死者視角「陰間」 */
-export type ChatScope = 'watch' | 'ghost';
+/** 聊天房別：觀戰端「陽間」、死者視角「陰間」、GM 專用 AI 規則問答「ai」（schema 免改，共用 scope 欄） */
+export type ChatScope = 'watch' | 'ghost' | 'ai';
 
 /** 觀戰/陰間聊天訊息（獨立於 events，不進 reducer/undo） */
 export interface ChatMessage {

@@ -1059,6 +1059,151 @@
   cursor: not-allowed;
 }
 
+/* ---------- GM × AI 規則助手聊天室 ---------- */
+.chip-ai {
+  background: #134e4a;
+  color: #5eead4;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+}
+.ai-chat-room .chat-list {
+  gap: 10px;
+}
+.ai-msg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 88%;
+}
+.ai-msg-row.ai-msg-gm {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.ai-msg-row.ai-msg-ai {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.ai-msg-badge {
+  margin-bottom: 1px;
+}
+.ai-msg-bubble {
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.ai-msg-gm .ai-msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg-ai .ai-msg-bubble {
+  background: var(--bg-elev2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg-thinking {
+  opacity: 0.65;
+  font-style: italic;
+}
+/* 串流中的打字游標（AI 回覆逐字浮現時掛在文字尾端） */
+.ai-msg-caret::after {
+  content: '▍';
+  margin-left: 1px;
+  opacity: 0.7;
+  animation: ai-caret-blink 1s steps(1) infinite;
+}
+@keyframes ai-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+/* AI 回覆 markdown 元素樣式（見 ChatRoom.tsx 的 AiMarkdown；GM 自己的訊息維持純文字不會命中這些選擇器） */
+.ai-msg-bubble p {
+  margin: 0 0 6px;
+}
+.ai-msg-bubble p:last-child {
+  margin-bottom: 0;
+}
+.ai-msg-bubble ul,
+.ai-msg-bubble ol {
+  margin: 4px 0 6px;
+  padding-left: 1.3em;
+}
+.ai-msg-bubble li {
+  margin: 2px 0;
+}
+.ai-msg-bubble li > p {
+  margin: 0;
+}
+.ai-msg-bubble h1,
+.ai-msg-bubble h2,
+.ai-msg-bubble h3,
+.ai-msg-bubble h4 {
+  margin: 8px 0 4px;
+  font-size: 1em;
+  font-weight: 700;
+}
+.ai-msg-bubble h1:first-child,
+.ai-msg-bubble h2:first-child,
+.ai-msg-bubble h3:first-child,
+.ai-msg-bubble h4:first-child {
+  margin-top: 0;
+}
+.ai-msg-bubble blockquote {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--border-hi);
+  color: var(--text-dim);
+}
+.ai-msg-bubble code {
+  background: var(--bg-elev2);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.ai-msg-bubble pre {
+  margin: 4px 0;
+  padding: 8px 10px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.ai-msg-bubble pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+.ai-msg-bubble .ai-md-table-wrap {
+  overflow-x: auto;
+  margin: 4px 0;
+}
+.ai-msg-bubble table {
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.ai-msg-bubble th,
+.ai-msg-bubble td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.ai-msg-bubble hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+}
+.ai-msg-bubble a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* ---------- 觀戰夜幕 ---------- */
 .night-curtain {
   text-align: center;
@@ -1146,6 +1291,14 @@
       transform: translateY(12px);
       opacity: 0;
     }
+  }
+  /* AI 規則助手面板專屬加大（見 ChatFab 的 size="lg"），寬螢幕才生效，手機貼底樣式不動 */
+  .fab-panel-lg {
+    width: min(680px, 92vw);
+    height: 75vh;
+  }
+  .fab-panel-lg .ai-msg-row {
+    max-width: 95%;
   }
 }
 .fab-panel-header {

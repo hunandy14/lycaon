@@ -1,3 +1,4 @@
+import './env'; // 最頂端載入 server/.env（在任何讀 process.env 的模組之前）
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
