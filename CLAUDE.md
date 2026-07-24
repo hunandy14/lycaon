@@ -54,8 +54,9 @@ POST /api/games/:id/chat        → body { scope: 'watch'|'ghost', text }；nick
                                    免 rate limit（已過密碼驗證非匿名觀眾）；需密碼
 GET  /api/games/:id/chat/stream → SSE（update 心跳 + chat：兩房訊息都轉發）；需密碼
 GET  /api/games/:id/ai-chat     → { enabled, messages }（GM AI 規則問答歷史，scope 'ai' 獨立房）；需密碼
-POST /api/games/:id/ai-chat     → body { text }（trim 後 1–500 字，否則 400）；200 { question, reply }；
-                                  502=AI 上游失敗（GM 問題已入歷史）、503=AI 未設定（AI_* 環境變數缺）；需密碼
+POST /api/games/:id/ai-chat     → body { text }（trim 後 1–500 字，否則 400）；200 NDJSON 串流（一行一 JSON 事件）：
+                                  delta（AI 文字增量）→ done（附已落庫的 question/reply）或 error（上游失敗，
+                                  GM 問題留歷史）；400/503（AI 未設定，AI_* 環境變數缺）維持 JSON 短路；需密碼
 GET  /api/roster               → { names }（座位名字自動完成清單）
 GET  /api/stats                → { totalGames, players[] }（跨已結束局的玩家勝率/角色分佈聚合）
 ```
@@ -140,12 +141,15 @@ phase 驅動的單頁儀表板，所有畫面手機直式、繁中。
     `localStorage(lycaon:ghosteye:<token>)`。`npm test` 綠（含 `server/test/ghost.test.ts` 覆蓋 token 隔離/
     canReveal 降級/聊天分房/GM 密碼與 rate limit）。
 - ✅ **AI 規則問答（GM 專用）**（`feat/ai-rules-chat`）：後端串 Cloudflare Workers AI 的 OpenAI 相容端點
-  （`server/src/ai.ts` 的 `aiEnabled`/`askAi`，AbortController 60s 逾時、錯誤絕不含 token）。金鑰放 `server/.env`
+  （`server/src/ai.ts` 的 `aiEnabled`/`askAiStream`——stream:true 解析上游 SSE 逐塊 yield delta，
+  AbortController 60s 全程逾時、錯誤絕不含 token）。金鑰放 `server/.env`
   （gitignored，樣板見 `server/.env.example`），由零依賴載入器 `server/src/env.ts` 於 `index.ts` 最頂端載入
   （`import.meta.url` 定位、只補未定義的 key）。system prompt（`server/src/aiPrompt.ts`）＝繁中指示＋九支引擎規則檔
   原文（模組層快取，唯一規則權威、未定義即由 GM 裁定）＋`engine/src/summary.ts` 的 `buildSituationSummary`
-  組出的 GM 全知戰況；chat 走 `scope='ai'` 獨立房（不進 watch/ghost SSE、與 undo 無關）。client 端 GamePage
-  以聊天球呈現（一問一答、GM/AI 徽章）。`npm test` 綠（含 `server/test/ai-chat.test.ts` 與 `engine/test/summary.test.ts`）。
+  組出的 GM 全知戰況；chat 走 `scope='ai'` 獨立房（不進 watch/ghost SSE、與 undo 無關）。POST 端點為 NDJSON
+  串流（delta/done/error，見 API 段；AI 全文串流完成後才 appendChat，DB 永遠是完整訊息）。client 端 GamePage
+  以聊天球呈現（一問一答、GM/AI 徽章，回覆逐字浮現）。`npm test` 綠（含 `server/test/ai-chat.test.ts` 與
+  `engine/test/summary.test.ts`）。
 - ⬜ Google 登入（綁定名冊繼承戰績）為未來項目。
 - ⬜ 場外待辦：CF Access bypass 清單需補 `/ghost/*` 與 `/api/ghost/*`（陰間端已在 server 端過濾，比照
   `/watch/*` 與 `/api/watch/*` 的放行原則；`/api/games/*` 依然絕不可放行）。

@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { stream, streamSSE } from 'hono/streaming';
 import type { Context } from 'hono';
 import { nanoid } from 'nanoid';
 import type { GameConfig, GameEvent, GameProgress, ShareSettings } from '@lycaon/engine';
 import { replay, validate, validateConfig, gameProgress, buildGameReport, buildSituationSummary, BOARD_PRESETS, DEFAULT_SHARE } from '@lycaon/engine';
-import type { ChatScope, EventStore, GameRow } from '../db';
+import type { ChatMessage, ChatScope, EventStore, GameRow } from '../db';
 import { hashPassword, verifyPassword } from '../auth';
 import { notify, notifyChat, subscribe } from '../live';
-import { aiEnabled, askAi, type AiMessage } from '../ai';
+import { aiEnabled, askAiStream, type AiMessage } from '../ai';
 import { buildSystemPrompt, capSituation, buildConversation } from '../aiPrompt';
 import { parseShare } from './watch';
 
@@ -15,6 +15,18 @@ import { parseShare } from './watch';
  * 夜間祕密行動：觀戰端本來就拉夜幕看不到，這些事件不推 SSE——連「更新的時機」都藏住，
  * 杜絕偷看的活人從推播節奏反推 GM 進行到哪一步。天亮/投票/公佈死訊等照常推。
  */
+/**
+ * POST /:id/ai-chat 串流協議（NDJSON：每行一個 JSON 物件，content-type application/x-ndjson）：
+ * - delta：AI 回覆文字增量（逐塊浮現用）
+ * - done：串流成功收尾，附完整 question/reply 兩則 ChatMessage（reply 為存進 DB 後的真實記錄）
+ * - error：上游中途失敗收尾（人類可讀繁中訊息；GM 問題留歷史，孤兒由 buildConversation 自癒）
+ * 400/503 等前置檢查仍為非串流 JSON 短路——進得了串流 HTTP 狀態一律 200，結果看最後一個事件。
+ */
+type AiStreamEvent =
+  | { t: 'delta'; text: string }
+  | { t: 'done'; question: ChatMessage; reply: ChatMessage }
+  | { t: 'error'; message: string };
+
 const NIGHT_SECRET_EVENTS = new Set<GameEvent['type']>([
   'GUARD_ACTED',
   'WOLVES_ACTED',
@@ -304,14 +316,27 @@ export function gamesRoutes(store: EventStore): Hono {
       ...buildConversation(history),
     ];
 
-    let replyText: string;
-    try {
-      replyText = await askAi(messages);
-    } catch (e) {
-      return c.json({ error: `AI 回應失敗：${(e as Error).message}` }, 502);
-    }
-    const reply = store.appendChat(game.id, 'AI', replyText, new Date().toISOString(), 'ai', false);
-    return c.json({ question, reply });
+    // 串流回應（協議見 AiStreamEvent）：delta 逐塊下發，全文完成才 appendChat——DB 裡永遠是完整訊息，
+    // 孤兒自癒與歷史組裝邏輯不受影響。
+    c.header('content-type', 'application/x-ndjson; charset=utf-8');
+    c.header('cache-control', 'no-cache');
+    return stream(c, async (s) => {
+      const upstream = new AbortController();
+      s.onAbort(() => upstream.abort()); // client 斷線：中止上游、不落半截回覆（問題留歷史，下一問自癒）
+      const write = (ev: AiStreamEvent) => s.write(`${JSON.stringify(ev)}\n`);
+      let full = '';
+      try {
+        for await (const delta of askAiStream(messages, upstream.signal)) {
+          full += delta;
+          await write({ t: 'delta', text: delta });
+        }
+        const reply = store.appendChat(game.id, 'AI', full, new Date().toISOString(), 'ai', false);
+        await write({ t: 'done', question, reply });
+      } catch (e) {
+        // 上游中途失敗：以 error 事件收尾（訊息絕不含 token）；GM 問題已入歷史可重問
+        await write({ t: 'error', message: `AI 回應失敗：${(e as Error).message}` }).catch(() => {});
+      }
+    });
   });
 
   return app;
