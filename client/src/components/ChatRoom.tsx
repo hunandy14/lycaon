@@ -302,6 +302,9 @@ function AiChatRoom({ gameId }: { gameId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  /** 進行中泡泡是否該顯示：送出即 true，onDone/onError 立刻轉 false（與換上真實記錄同一次 commit，
+   *  避免回覆泡泡短暫重複）。與 sending 分離——sending 維持到 finally 才放（守住「同時只一則在途」不變式）。 */
+  const [streaming, setStreaming] = useState(false);
   /** 進行中的 AI 回覆逐塊累積文字；null=尚無 delta（顯示「思考中…」） */
   const [streamText, setStreamText] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -328,7 +331,7 @@ function AiChatRoom({ gameId }: { gameId: string }) {
 
   useEffect(() => {
     if (stickRef.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages, sending, streamText]);
+  }, [messages, streaming, streamText]);
 
   const handleScroll = () => {
     const el = listRef.current;
@@ -354,21 +357,28 @@ function AiChatRoom({ gameId }: { gameId: string }) {
     setMessages((prev) => [...prev, localQuestion]);
     setText('');
     setSending(true);
+    setStreaming(true);
     setStreamText(null);
     try {
       await api.sendAiChatStream(gameId, roomPass.get(gameId), trimmedText, {
         onDelta: (delta) => setStreamText((prev) => (prev ?? '') + delta),
         onDone: (question, reply) => {
-          // 進行中泡泡由 finally 清掉，這裡換上落庫後的真實記錄
+          // 同一次 commit：換上落庫後的真實記錄 + 收掉進行中泡泡，避免回覆短暫重複兩份
+          // （sending 留到 finally 才放，這段期間仍鎖輸入，守住「同時只一則在途」）
           setMessages((prev) => [...prev.filter((m) => m.id !== localId), question, reply]);
+          setStreaming(false);
         },
-        // error 事件（上游中途失敗/連線中斷）：問題泡泡保留，僅 Toast 提示；進行中泡泡由 finally 清掉
-        onError: (message) => setErr(message),
+        // error 事件（上游中途失敗/連線中斷）：問題泡泡保留，僅 Toast 提示；進行中泡泡立刻收掉
+        onError: (message) => {
+          setStreaming(false);
+          setErr(message);
+        },
       });
     } catch (e) {
       // 非串流短路（400/401/503）或網路失敗：問題泡泡照留，不移除 localQuestion
       setErr((e as Error).message || 'AI 助手回覆失敗');
     } finally {
+      setStreaming(false);
       setStreamText(null);
       setSending(false);
     }
@@ -397,7 +407,7 @@ function AiChatRoom({ gameId }: { gameId: string }) {
             <div className="ai-msg-bubble">{m.isGm ? m.text : <AiMarkdown text={m.text} />}</div>
           </div>
         ))}
-        {sending && (
+        {streaming && (
           <div className="ai-msg-row ai-msg-ai">
             <span className="chip chip-ai ai-msg-badge">
               <span aria-hidden="true">🤖</span> 規則助手
