@@ -4,6 +4,17 @@
  * 錯誤訊息一律不含 token。
  */
 
+/**
+ * AI_DISABLE_THINKING='1' | 'true' 時關閉上游 thinking 模式（首字延遲從 14–23 秒降到 1–3 秒）。
+ * 用 env 開關而非寫死：這是 CF Workers AI / vLLM 對 GLM 系列模型的慣用格式
+ * （chat_template_kwargs.enable_thinking，與 Z.ai 官方 API 的 thinking.type 參數不同），
+ * 換成非 GLM 模型時若送出此欄位對方可能不認得，故預設不送、需明確開啟。
+ */
+function disableThinking(): boolean {
+  const v = process.env.AI_DISABLE_THINKING;
+  return v === '1' || v === 'true';
+}
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -46,7 +57,12 @@ export async function* askAiStream(
       res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ model, messages, stream: true }),
+        body: JSON.stringify({
+          model,
+          messages,
+          stream: true,
+          ...(disableThinking() ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+        }),
         signal: controller.signal,
       });
     } catch (e) {
