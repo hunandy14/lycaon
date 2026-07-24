@@ -3,10 +3,12 @@ import { streamSSE } from 'hono/streaming';
 import type { Context } from 'hono';
 import { nanoid } from 'nanoid';
 import type { GameConfig, GameEvent, GameProgress, ShareSettings } from '@lycaon/engine';
-import { replay, validate, validateConfig, gameProgress, BOARD_PRESETS, DEFAULT_SHARE } from '@lycaon/engine';
+import { replay, validate, validateConfig, gameProgress, buildGameReport, buildSituationSummary, BOARD_PRESETS, DEFAULT_SHARE } from '@lycaon/engine';
 import type { ChatScope, EventStore, GameRow } from '../db';
 import { hashPassword, verifyPassword } from '../auth';
 import { notify, notifyChat, subscribe } from '../live';
+import { aiEnabled, askAi, type AiMessage } from '../ai';
+import { buildSystemPrompt } from '../aiPrompt';
 import { parseShare } from './watch';
 
 /**
@@ -258,6 +260,55 @@ export function gamesRoutes(store: EventStore): Hono {
         if (alive) await stream.writeSSE({ event: 'ping', data: '' });
       }
     });
+  });
+
+  // ── AI 規則問答（GM 專用；scope 'ai' 獨立房，不進 watch/ghost SSE、與觀戰無關；一律過房主密碼） ──
+  app.get('/:id/ai-chat', (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
+    return c.json({ enabled: aiEnabled(), messages: store.listChat(game.id, 'ai', 200) });
+  });
+
+  app.post('/:id/ai-chat', async (c) => {
+    const game = store.getGame(c.req.param('id'));
+    if (!game) return c.json({ error: '對局不存在' }, 404);
+    const denied = checkAuth(game, c, true);
+    if (denied) return denied;
+    // AI 未設定：不入歷史，直接回 503（與「上游失敗」的 502 語意分開）
+    if (!aiEnabled()) return c.json({ error: 'AI 規則助手尚未設定（server/.env 需填 AI_BASE_URL/AI_TOKEN/AI_MODEL）' }, 503);
+
+    let body: { text?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: '格式錯誤' }, 400);
+    }
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (text.length < 1 || text.length > 500) return c.json({ error: '訊息長度需為 1–500 字' }, 400);
+
+    // GM 問題先入歷史：即使 AI 上游失敗，問題也留著（可檢視/重試），是預期行為
+    const question = store.appendChat(game.id, 'GM', text, new Date().toISOString(), 'ai', true);
+
+    // 組戰況：replay → GameState、buildGameReport → GameReport → buildSituationSummary
+    const envelopes = store.loadEnvelopes(game.id);
+    const situation = buildSituationSummary(replay(envelopes), buildGameReport(envelopes));
+
+    // system 一則 + AI 房歷史逐則映射（GM=user、AI=assistant；剛存的問題即最後一則 user）
+    const messages: AiMessage[] = [
+      { role: 'system', content: buildSystemPrompt(situation) },
+      ...store.listChat(game.id, 'ai', 200).map((m): AiMessage => ({ role: m.isGm ? 'user' : 'assistant', content: m.text })),
+    ];
+
+    let replyText: string;
+    try {
+      replyText = await askAi(messages);
+    } catch (e) {
+      return c.json({ error: `AI 回應失敗：${(e as Error).message}` }, 502);
+    }
+    const reply = store.appendChat(game.id, 'AI', replyText, new Date().toISOString(), 'ai', false);
+    return c.json({ question, reply });
   });
 
   return app;
