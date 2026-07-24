@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Ghost, MessageCircle } from 'lucide-react';
+import { Bot, Ghost, MessageCircle } from 'lucide-react';
 import { useGame } from '../hooks/useGame';
 import { PhaseBanner } from '../components/PhaseBanner';
 import { StatusBar } from '../components/StatusBar';
@@ -21,7 +21,7 @@ export function GamePage() {
   const g = useGame(id);
   const [shareOpen, setShareOpen] = useState(false);
   const [ghostOpen, setGhostOpen] = useState(false);
-  const [openChat, setOpenChat] = useState<'ghost' | 'watch' | null>(null);
+  const [openChat, setOpenChat] = useState<'ghost' | 'watch' | 'ai' | null>(null);
   const [shareSettings, setShareSettings] = useState<ShareSettings | null>(null);
   useWakeLock(g.state?.phase.t !== 'ended');
 
@@ -53,6 +53,8 @@ export function GamePage() {
   const watchChatAvailable = !!shareSettings?.showChat;
   const ghostUnread = useChatUnread({ gm: true, gameId: id, scope: 'ghost' }, openChat === 'ghost', ghostChatAvailable);
   const watchUnread = useChatUnread({ gm: true, gameId: id, scope: 'watch' }, openChat === 'watch', watchChatAvailable);
+  // AI 規則助手球永遠顯示（不受同樂/陰間開關影響），疊在其他已顯示的聊天球之上；GM 自己發起的對話不需要未讀徽章
+  const aiSlot = (ghostChatAvailable ? 1 : 0) + (watchChatAvailable ? 1 : 0);
 
   if (g.loading) return <div className="app"><p className="center muted" style={{ marginTop: 60 }}>載入對局中…</p></div>;
   if (g.needPassword) return <UnlockGate busy={g.busy} error={g.error} onUnlock={g.unlock} />;
@@ -119,6 +121,16 @@ export function GamePage() {
           <ChatRoom gm gameId={id} scope="watch" />
         </ChatFab>
       )}
+      <ChatFab
+        icon={Bot}
+        label="AI 規則助手"
+        accent="#14b8a6"
+        open={openChat === 'ai'}
+        onToggle={() => setOpenChat((v) => (v === 'ai' ? null : 'ai'))}
+        slot={aiSlot}
+      >
+        <ChatRoom ai gameId={id} />
+      </ChatFab>
     </div>
   );
 }
