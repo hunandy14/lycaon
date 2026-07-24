@@ -1111,6 +1111,18 @@
   opacity: 0.65;
   font-style: italic;
 }
+/* 串流中的打字游標（AI 回覆逐字浮現時掛在文字尾端） */
+.ai-msg-caret::after {
+  content: '▍';
+  margin-left: 1px;
+  opacity: 0.7;
+  animation: ai-caret-blink 1s steps(1) infinite;
+}
+@keyframes ai-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
 
 /* ---------- 觀戰夜幕 ---------- */
 .night-curtain {

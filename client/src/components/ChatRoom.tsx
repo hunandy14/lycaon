@@ -257,13 +257,16 @@ const AI_TEXT_MAX = 500;
 
 /** GM × AI 規則助手（gm=true 的第三變體）：無暱稱列，GM 提問／AI 回覆。無 SSE、無輪詢——單一寫者
  *  （只有 GM 自己會發言），開面板時 GET 一次歷史即可。送出後本地先樂觀顯示提問泡泡＋「思考中…」佔位
- *  （鎖定輸入），成功後用 server 回的 question/reply 取代本地暫存；502/503 失敗時僅移除思考中佔位、
- *  問題泡泡照留（server 502 情況下問題其實已寫入歷史，只是這裡沒有真正 id 可對齊，就地保留顯示即可）。 */
+ *  （鎖定輸入），回覆走串流（api.sendAiChatStream）：delta 逐塊 append 到進行中泡泡（streamText），
+ *  done 後用 server 回的 question/reply（已落庫的真實記錄）取代本地暫存並解鎖；error 事件或連線失敗
+ *  只清進行中泡泡、問題泡泡照留（server 端問題其實已寫入歷史，就地保留顯示即可），Toast 顯示錯誤。 */
 function AiChatRoom({ gameId }: { gameId: string }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  /** 進行中的 AI 回覆逐塊累積文字；null=尚無 delta（顯示「思考中…」） */
+  const [streamText, setStreamText] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -288,7 +291,7 @@ function AiChatRoom({ gameId }: { gameId: string }) {
 
   useEffect(() => {
     if (stickRef.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages, sending]);
+  }, [messages, sending, streamText]);
 
   const handleScroll = () => {
     const el = listRef.current;
@@ -314,13 +317,22 @@ function AiChatRoom({ gameId }: { gameId: string }) {
     setMessages((prev) => [...prev, localQuestion]);
     setText('');
     setSending(true);
+    setStreamText(null);
     try {
-      const r = await api.sendAiChat(gameId, roomPass.get(gameId), trimmedText);
-      setMessages((prev) => [...prev.filter((m) => m.id !== localId), r.question, r.reply]);
+      await api.sendAiChatStream(gameId, roomPass.get(gameId), trimmedText, {
+        onDelta: (delta) => setStreamText((prev) => (prev ?? '') + delta),
+        onDone: (question, reply) => {
+          // 進行中泡泡由 finally 清掉，這裡換上落庫後的真實記錄
+          setMessages((prev) => [...prev.filter((m) => m.id !== localId), question, reply]);
+        },
+        // error 事件（上游中途失敗/連線中斷）：問題泡泡保留，僅 Toast 提示；進行中泡泡由 finally 清掉
+        onError: (message) => setErr(message),
+      });
     } catch (e) {
-      // 問題泡泡保留：只清「思考中」佔位（由 sending 狀態控制），不移除 localQuestion
+      // 非串流短路（400/401/503）或網路失敗：問題泡泡照留，不移除 localQuestion
       setErr((e as Error).message || 'AI 助手回覆失敗');
     } finally {
+      setStreamText(null);
       setSending(false);
     }
   };
@@ -353,7 +365,14 @@ function AiChatRoom({ gameId }: { gameId: string }) {
             <span className="chip chip-ai ai-msg-badge">
               <span aria-hidden="true">🤖</span> 規則助手
             </span>
-            <span className="ai-msg-bubble ai-msg-thinking">思考中…</span>
+            {streamText === null ? (
+              <span className="ai-msg-bubble ai-msg-thinking">思考中…</span>
+            ) : (
+              <span className="ai-msg-bubble">
+                {streamText}
+                <span className="ai-msg-caret" aria-hidden="true" />
+              </span>
+            )}
           </div>
         )}
       </div>
