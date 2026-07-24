@@ -8,7 +8,7 @@ import type { ChatScope, EventStore, GameRow } from '../db';
 import { hashPassword, verifyPassword } from '../auth';
 import { notify, notifyChat, subscribe } from '../live';
 import { aiEnabled, askAi, type AiMessage } from '../ai';
-import { buildSystemPrompt } from '../aiPrompt';
+import { buildSystemPrompt, capSituation, buildConversation } from '../aiPrompt';
 import { parseShare } from './watch';
 
 /**
@@ -291,14 +291,17 @@ export function gamesRoutes(store: EventStore): Hono {
     // GM 問題先入歷史：即使 AI 上游失敗，問題也留著（可檢視/重試），是預期行為
     const question = store.appendChat(game.id, 'GM', text, new Date().toISOString(), 'ai', true);
 
-    // 組戰況：replay → GameState、buildGameReport → GameReport → buildSituationSummary
+    // 組戰況：replay → GameState、buildGameReport → GameReport → buildSituationSummary（過長截斷防撞 context）
     const envelopes = store.loadEnvelopes(game.id);
-    const situation = buildSituationSummary(replay(envelopes), buildGameReport(envelopes));
+    const situation = capSituation(buildSituationSummary(replay(envelopes), buildGameReport(envelopes)));
 
-    // system 一則 + AI 房歷史逐則映射（GM=user、AI=assistant；剛存的問題即最後一則 user）
+    // system 一則 + AI 房歷史（GM=user、AI=assistant）；buildConversation 取近況並修正孤兒提問／確保嚴格交替
+    const history = store
+      .listChat(game.id, 'ai', 200)
+      .map((m): AiMessage => ({ role: m.isGm ? 'user' : 'assistant', content: m.text }));
     const messages: AiMessage[] = [
       { role: 'system', content: buildSystemPrompt(situation) },
-      ...store.listChat(game.id, 'ai', 200).map((m): AiMessage => ({ role: m.isGm ? 'user' : 'assistant', content: m.text })),
+      ...buildConversation(history),
     ];
 
     let replyText: string;

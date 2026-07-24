@@ -128,4 +128,27 @@ describe('AI 規則問答', () => {
     expect(hist).toHaveLength(1);
     expect(hist[0]).toMatchObject({ nick: 'GM', isGm: true, text: '守衛能連守嗎？' });
   });
+
+  it('前一問上游失敗留下孤兒提問：下一問組出的對話仍嚴格 user/assistant 交替（孤兒被丟棄、不會卡死）', async () => {
+    const { app, store } = setup();
+    // 第一問：上游失敗 → 問題留在歷史成孤兒（沒有對應 assistant 回覆）
+    vi.mocked(askAi).mockRejectedValueOnce(new Error('boom'));
+    const first = await post(app, '第一問（會失敗）');
+    expect(first.status).toBe(502);
+    expect(store.listChat('g1', 'ai', 200)).toHaveLength(1);
+
+    // 第二問：上游恢復 → 應成功且不因孤兒破壞交替
+    const second = await post(app, '第二問（成功）');
+    expect(second.status).toBe(200);
+
+    // 檢查第二次送給 askAi 的 messages：system 起頭、其後嚴格交替、不得出現連續兩則 user
+    const messages = vi.mocked(askAi).mock.calls.at(-1)![0];
+    expect(messages[0]!.role).toBe('system');
+    for (let i = 1; i < messages.length - 1; i++) {
+      expect(messages[i]!.role).not.toBe(messages[i + 1]!.role);
+    }
+    // 最後一則為最新問題；孤兒舊問題不再參與送出的對話
+    expect(messages.at(-1)).toMatchObject({ role: 'user', content: '第二問（成功）' });
+    expect(messages.some((m) => m.content === '第一問（會失敗）')).toBe(false);
+  });
 });
