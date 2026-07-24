@@ -1059,6 +1059,59 @@
   cursor: not-allowed;
 }
 
+/* ---------- GM × AI 規則助手聊天室 ---------- */
+.chip-ai {
+  background: #134e4a;
+  color: #5eead4;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+}
+.ai-chat-room .chat-list {
+  gap: 10px;
+}
+.ai-msg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 88%;
+}
+.ai-msg-row.ai-msg-gm {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.ai-msg-row.ai-msg-ai {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.ai-msg-badge {
+  margin-bottom: 1px;
+}
+.ai-msg-bubble {
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.ai-msg-gm .ai-msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg-ai .ai-msg-bubble {
+  background: var(--bg-elev2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg-thinking {
+  opacity: 0.65;
+  font-style: italic;
+}
+
 /* ---------- 觀戰夜幕 ---------- */
 .night-curtain {
   text-align: center;

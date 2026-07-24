@@ -32,13 +32,15 @@ export type GhostData = { title: string } & ((GhostView & { god: true }) | (Spec
 
 export type ChatScope = 'watch' | 'ghost';
 
-/** 聊天訊息（獨立於遊戲事件，不進 reducer/undo）。scope 分房；isGm=GM 監看端發言 */
+/** 聊天訊息（獨立於遊戲事件，不進 reducer/undo）。scope 分房；isGm=GM 監看端發言。
+ *  scope 額外允許 'ai'（AI 規則助手房，見 getAiChat/sendAiChat）——獨立於 watch/ghost 的 ChatScope，
+ *  以免既有兩房邏輯（如 { watch, ghost } 索引）的窮舉型別被迫多處理一個不存在的分支。 */
 export interface ChatMessage {
   id: number;
   gameId: string;
   nick: string;
   text: string;
-  scope: ChatScope;
+  scope: ChatScope | 'ai';
   isGm: boolean;
   createdAt: string;
 }
@@ -168,6 +170,18 @@ export const api = {
   /** GM 發言：nick 固定 'GM'、isGm=1，server 端免 rate limit（需房主密碼） */
   sendGmChat: (id: string, scope: ChatScope, text: string) =>
     req<ChatMessage>(`/games/${id}/chat`, { method: 'POST', body: JSON.stringify({ scope, text }) }, roomPass.get(id)),
+
+  /** AI 規則助手歷史（scope 一律 'ai'；需房主密碼）。enabled=false 代表 server 未設定上游金鑰。 */
+  getAiChat: (id: string, pass?: string | null) =>
+    req<{ enabled: boolean; messages: ChatMessage[] }>(`/games/${id}/ai-chat`, undefined, pass),
+
+  /** GM 提問；成功回問答一組（各自已入歷史），502=AI 上游失敗（問題已入歷史，回覆缺席）、503=AI 未設定（需房主密碼） */
+  sendAiChat: (id: string, pass: string | null | undefined, text: string) =>
+    req<{ question: ChatMessage; reply: ChatMessage }>(
+      `/games/${id}/ai-chat`,
+      { method: 'POST', body: JSON.stringify({ text }) },
+      pass,
+    ),
 
   getRoster: () => req<{ names: string[] }>('/roster').then((r) => r.names),
 
